@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-snaptics - Editor de código con terminal integrada
-Ventana principal modular
+snaptics
 """
 
 from PyQt6 import QtCore, QtWidgets
@@ -12,7 +11,7 @@ from .theme_manager import ThemeManager
 
 
 class SnapticsMainWindow(QtWidgets.QMainWindow):
-    """Ventana principal de snaptics con arquitectura modular"""
+    """Ventana principal de snaptics"""
     
     def __init__(self):
         super().__init__()

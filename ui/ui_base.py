@@ -112,6 +112,12 @@ class Ui_snaptics(object):
         self.menuEdit = QtWidgets.QMenu(parent=self.menuBar)
         self.menuEdit.setObjectName("menuEdit")
         
+        self.menuView = QtWidgets.QMenu(parent=self.menuBar)
+        self.menuView.setObjectName("menuView")
+        
+        self.menuRun = QtWidgets.QMenu(parent=self.menuBar)
+        self.menuRun.setObjectName("menuRun")
+        
         self.menuTheme = QtWidgets.QMenu(parent=self.menuBar)
         self.menuTheme.setObjectName("menuTheme")
         
@@ -154,6 +160,20 @@ class Ui_snaptics(object):
         self.actionpaste = QtGui.QAction(parent=snaptics)
         self.actionpaste.setObjectName("actionpaste")
         
+        # Acciones de vista
+        self.actionTokens = QtGui.QAction(parent=snaptics)
+        self.actionTokens.setObjectName("actionTokens")
+        
+        self.actionSymbols = QtGui.QAction(parent=snaptics)
+        self.actionSymbols.setObjectName("actionSymbols")
+        
+        # Acciones de ejecución
+        self.actionCompile = QtGui.QAction(parent=snaptics)
+        self.actionCompile.setObjectName("actionCompile")
+        
+        self.actionRun = QtGui.QAction(parent=snaptics)
+        self.actionRun.setObjectName("actionRun")
+        
         # Acciones de tema
         self.actionDark = QtGui.QAction(parent=snaptics)
         self.actionDark.setObjectName("actionDark")
@@ -187,6 +207,14 @@ class Ui_snaptics(object):
         self.menuEdit.addAction(self.actioncopy)
         self.menuEdit.addAction(self.actionpaste)
         
+        # Menú Vista
+        self.menuView.addAction(self.actionTokens)
+        self.menuView.addAction(self.actionSymbols)
+        
+        # Menú Ejecutar
+        self.menuRun.addAction(self.actionCompile)
+        self.menuRun.addAction(self.actionRun)
+        
         # Menú Tema
         self.menuTheme.addAction(self.actionDark)
         self.menuTheme.addAction(self.actionLight)
@@ -201,6 +229,8 @@ class Ui_snaptics(object):
         # Agregar menús a la barra
         self.menuBar.addAction(self.menuArchivo.menuAction())
         self.menuBar.addAction(self.menuEdit.menuAction())
+        self.menuBar.addAction(self.menuView.menuAction())
+        self.menuBar.addAction(self.menuRun.menuAction())
         self.menuBar.addAction(self.menuTheme.menuAction())
         self.menuBar.addAction(self.menuTerminal.menuAction())
         self.menuBar.addAction(self.menuHelp.menuAction())
@@ -218,6 +248,8 @@ class Ui_snaptics(object):
         # Menús
         self.menuArchivo.setTitle(_translate("snaptics", "File"))
         self.menuEdit.setTitle(_translate("snaptics", "Edit"))
+        self.menuView.setTitle(_translate("snaptics", "View"))
+        self.menuRun.setTitle(_translate("snaptics", "Run"))
         self.menuTheme.setTitle(_translate("snaptics", "Theme"))
         self.menuHelp.setTitle(_translate("snaptics", "Help"))
         self.menuTerminal.setTitle(_translate("snaptics", "Terminal"))
@@ -243,6 +275,16 @@ class Ui_snaptics(object):
         self.actioncopy.setShortcut(_translate("snaptics", "Ctrl+C"))
         self.actionpaste.setText(_translate("snaptics", "Paste"))
         self.actionpaste.setShortcut(_translate("snaptics", "Ctrl+V"))
+        
+        # Acciones de vista
+        self.actionTokens.setText(_translate("snaptics", "Tokens"))
+        self.actionSymbols.setText(_translate("snaptics", "Symbols"))
+        
+        # Acciones de ejecución
+        self.actionCompile.setText(_translate("snaptics", "Compile"))
+        self.actionCompile.setShortcut(_translate("snaptics", "F9"))
+        self.actionRun.setText(_translate("snaptics", "Run"))
+        self.actionRun.setShortcut(_translate("snaptics", "F5"))
         
         # Acciones de tema
         self.actionDark.setText(_translate("snaptics", "Dark"))
