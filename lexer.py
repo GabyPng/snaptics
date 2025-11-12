@@ -12,20 +12,104 @@ import ply.lex as lex
 """
 
 
-tokens = (
+reserved = {
+    # Tipos de datos para hechos y reglas
+    'fact' : 'FACT',
+    'rule' : 'RULE',
+    
+    # Tipos de datos probabilísticos y estadísticos. Para representar distribuciones y variables aleatorias 
+    'randvar' : 'RANDVAR',
+    'dist' : 'DIST',
+    'event' : 'EVENT',
+    'probability' : 'PROBABILITY',
+    'sample' : 'SAMPLE',
+    'posterior' : 'POSTERIOR',
+    
+    # Tipos derivados. Para soportar estructuras complejas o aprendizaje bayesiano
+    'dataset' : 'DATASET',
+    'query' : 'QUERY',
+    'model' : 'MODEL',
+    'parameter' : 'PARAMETER',
+    
+    'given' : 'GIVEN',
+    'evidence' : 'EVIDENCE',
+    'confidence' : 'CONFIDENCE',
+    
+    'prob' : 'PROB',
+    'Infer' : 'INFER',
+    'define' : 'DEFINE',
+    'return' : 'RETURN',
+    
+    'and' : 'AND',
+    'or' : 'OR',
+    'not' : 'NOT',
+    'true' : 'TRUE',
+    'false' : 'FALSE',
+    
+    # Importarl los datos
+    'import' : 'IMPORT',
+    'from' : 'FROM',
+    
+    # Para Análisis, investigación.
+    'analyze' : 'ANALIZE',
+    'discover' : 'DISCOVER',
+    'where' : 'WHERE',
+    
+    'if' : 'IF',
+    'then' : 'THEN',
+    'else' : 'ELSE',
+    'for' : 'FOR',
+    'each' : 'EACH',
+    'as' : 'AS',
+    
+    'load' : 'LOAD',
+    'measure' : 'MEASURE',
+    'pattern' : 'PATTERN',
+    'observe' : 'OBSERVE',
+    
+    'calculate' : 'CALCULATE',
+    'reason' : 'REASON',
+    'with' : 'WITH',
+    'show' : 'SHOW'
+}
+
+tokens = [
     'ID',
-    'NUMINT',
-    'NUMREAL',
+    'INT',
+    'REAL',
+    'STRING',
+    'BOOL',
+    'ATOM', # Para hechos probabilisticos hecho(planta_verde)
+    
+    'RECORD',
+    'LIST',
+    'SET',
+    'DICT',
+    # FACT hecho(llueve, 0.3)
+    # RULE prob(llueve(X)) :- humedad(X) > 0.8.
+    
     'LPAREN',
     'RPAREN',
+    
     'ADD',
     'SUB',
-    'ASIG',
+    'MUL',
+    'DIV',
+    
+    #'AND',
+    #'OR',
+    #'NOT',
+    #'IMPLIES',
+    'EQ',
+    'NEQ',
     'LESSTHAN',
     'GREATERTHAN',
-    'EQ',
-    'NUMBER'
-)
+    'LEQ',
+    'GEQ',
+    
+    'ASIG',
+    'COND'
+] + list(reserved.values())
 
 t_ignore  = ' \t'
 t_LPAREN = r'\('
@@ -37,22 +121,22 @@ t_LESSTHAN = r'\<'
 t_GREATERTHAN = r'\>'
 t_EQ = r'\=='
 
-reserved = {
-    'if' : 'IF',
-    'then' : 'THEN',
-    'else' : 'ELSE',
-    'while' : 'WHILE'
-}
-
 
 def t_ID(t):
-    r'[a-zA-Z_][a-zA-Z_0-9]*'
+    r'[a-z][a-zA-Z_0-9]*'
     t.type = reserved.get(t.value,'ID')    # Check for reserved words
+    # Look up symbol table information and return a tuple
+    t.value = (t.value, symbol_lookup(t.value))
     return t
 
-def t_NUMBER(t):
+def t_INT(t):
     r'\d+'
     t.value = int(t.value)
+    return t
+
+def t_REAL(t):
+    r'\f+'
+    t.value = float(t.value)
     return t
 
 def t_newline(t):
@@ -62,7 +146,13 @@ def t_newline(t):
 def t_error(t):
     print("Illegal character '%s'" % t.value[0])
     t.lexer.skip(1)
-    
+
+def t_COMMENT(t):
+    r'\#.*'
+    pass
+    # No return value. Token discarded
+
+
 lexer = lex.lex()
 
 data = '''
