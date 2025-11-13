@@ -1,0 +1,4 @@
+    import dataset ventas from "ventas.csv"
+    fact ventas_altas = P(ventas > 500) = 0.72
+    rule baja_rentabilidad :- ventas_altas < 0.5 and margen_bajo > 0.3
+    query rentabilidad_general

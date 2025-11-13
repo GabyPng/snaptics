@@ -185,9 +185,6 @@ class Ui_snaptics(object):
         self.actionNew_Terminal = QtGui.QAction(parent=snaptics)
         self.actionNew_Terminal.setObjectName("actionNew_Terminal")
         
-        self.actionHide_Terminal = QtGui.QAction(parent=snaptics)
-        self.actionHide_Terminal.setObjectName("actionHide_Terminal")
-        
         # Acción de ayuda
         self.actionAbout = QtGui.QAction(parent=snaptics)
         self.actionAbout.setObjectName("actionAbout")
@@ -221,7 +218,6 @@ class Ui_snaptics(object):
         
         # Menú Terminal
         self.menuTerminal.addAction(self.actionNew_Terminal)
-        self.menuTerminal.addAction(self.actionHide_Terminal)
         
         # Menú Ayuda
         self.menuHelp.addAction(self.actionAbout)
@@ -278,6 +274,7 @@ class Ui_snaptics(object):
         
         # Acciones de vista
         self.actionTokens.setText(_translate("snaptics", "Tokens"))
+        self.actionTokens.setShortcut(_translate("snaptics", "Ctrl+T"))
         self.actionSymbols.setText(_translate("snaptics", "Symbols"))
         
         # Acciones de ejecución
@@ -295,7 +292,5 @@ class Ui_snaptics(object):
         self.actionAbout.setShortcut(_translate("snaptics", "Ctrl+H"))
         
         # Acciones de terminal
-        self.actionNew_Terminal.setText(_translate("snaptics", "Show Terminal"))
-        self.actionNew_Terminal.setShortcut(_translate("snaptics", "Ctrl+Shift+T"))
-        self.actionHide_Terminal.setText(_translate("snaptics", "Hide Terminal"))
-        self.actionHide_Terminal.setShortcut(_translate("snaptics", "Ctrl+Shift+H"))
+        self.actionNew_Terminal.setText(_translate("snaptics", "Terminal"))
+        self.actionNew_Terminal.setShortcut(_translate("snaptics", "Ctrl+J"))

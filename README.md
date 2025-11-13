@@ -3,7 +3,8 @@
 Version 1.0:
 Integración de la interfaz desarrollada en QT Designer e importada en python. Se necesita instalar la librería pyQT.
 
-## Colaboración
+
+## Instalación y Uso
 
 Para colaborar en este proyecto, configuren el entorno de desarrollo con conda:
 
@@ -15,6 +16,18 @@ conda activate snaptics
 Después instalan PyQt6:
 ```bash
 conda install PyQt6
+```
+
+Con pip 
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### Ejecutar
+```bash
+python main.py
 ```
 
 ## Arquitectura
@@ -33,17 +46,7 @@ snaptics/
 └── lexer.py                  # Analizador léxico
 ```
 
-## Instalación y Uso
-
-### Requisitos
-```bash
-conda install PyQt6
-```
-
-### Ejecutar
-```bash
-python main.py
-```
+En la aplicación, abre o escribe código y presiona F9 (o menú Run → Compile) para ejecutar el analizador léxico y ver los tokens en la terminal integrada.
 
 ## Atajos de Teclado
 
@@ -61,9 +64,7 @@ python main.py
 - `Ctrl+V` - Pegar
 
 ### Terminal
-- `Ctrl+Shift+T` - Mostrar terminal
-- `Ctrl+Shift+H` - Ocultar terminal
-- `Ctrl+\`` - Alternar terminal
+- `Ctrl+J` - Alternar terminal
 
 ### Temas
 - `F12` - Alternar entre tema claro y oscuro
