@@ -71,6 +71,9 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
         self.ui.actionCompile.triggered.connect(self._run_lexer)
         # View > Tokens: mostrar/ocultar panel de tokens
         self.ui.actionTokens.triggered.connect(self._toggle_tokens_panel)
+        # View > Symbols
+        self.ui.actionSymbols.triggered.connect(self._open_symbols_dialog)
+        
 
         # Señal de ayuda
         self.ui.actionAbout.triggered.connect(self._show_about)
@@ -133,6 +136,12 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
 
             self._print_to_terminal("[Lexer] Analizando tokens...\n")
             result = lexer.tokenize(text)
+
+            # Guardar tokens para acceso posterior
+            try:
+                self.last_tokens = result.get('tokens', []) if isinstance(result, dict) else []
+            except Exception:
+                self.last_tokens = []
 
             if result['errors']:
                 # Mostrar errores y no mostrar tokens
@@ -226,3 +235,79 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
         """
         
         QtWidgets.QMessageBox.about(self, "Acerca de snaptics", about_text)
+    
+    def _get_existing_tokens(self):
+        tokens = []
+        try:
+            if hasattr(self, 'tokens_panel') and self.tokens_panel is not None:
+                tp = self.tokens_panel
+                if hasattr(tp, 'tokens'):
+                    tokens = tp.tokens
+                elif hasattr(tp, 'get_tokens'):
+                    tokens = tp.get_tokens()
+                elif hasattr(tp, 'current_tokens'):
+                    tokens = tp.current_tokens
+        except Exception:
+            tokens = []
+
+        if not tokens and hasattr(self, 'last_tokens'):
+            tokens = getattr(self, 'last_tokens', []) or []
+
+        return tokens or []
+
+    def _open_symbols_dialog(self):
+        """Abrir diálogo con tabla de símbolos usando el arreglo de tokens existente."""
+        try:
+            tokens = self._get_existing_tokens()
+
+            symbols = {}
+            for t in tokens:
+                try:
+                    if t.get('type') == 'ID':
+                        name = t.get('value')
+                        if name is None:
+                            continue
+                        name = str(name)
+                        # normalizar (por si el token viene con comillas)
+                        if (name.startswith("'") and name.endswith("'")) or (name.startswith('"') and name.endswith('"')):
+                            name = name[1:-1]
+                        line_no = int(t.get('line', 0)) if t.get('line') is not None else 0
+                        if name not in symbols or (line_no and line_no < symbols[name]):
+                            symbols[name] = line_no
+                except Exception:
+                    continue
+
+            # Crear diálogo con tabla
+            dialog = QtWidgets.QDialog(self)
+            dialog.setWindowTitle("Symbol Table")
+            layout = QtWidgets.QVBoxLayout(dialog)
+
+            table = QtWidgets.QTableWidget(parent=dialog)
+            table.setColumnCount(2)
+            table.setHorizontalHeaderLabels(["Name", "Line"])
+            table.setRowCount(len(symbols))
+            table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+            table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+            table.horizontalHeader().setStretchLastSection(True)
+
+            # Ordenar por número de línea (asc)
+            def _sort_key(item):
+                name, ln = item
+                ln_val = int(ln) if ln is not None else 0
+                
+                sort_ln = ln_val if ln_val > 0 else float('inf')
+                return (sort_ln, name.lower())
+
+            for i, (name, line_no) in enumerate(sorted(symbols.items(), key=_sort_key)):
+                table.setItem(i, 0, QtWidgets.QTableWidgetItem(name))
+                table.setItem(i, 1, QtWidgets.QTableWidgetItem(str(line_no)))
+
+            layout.addWidget(table)
+            buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.StandardButton.Close, parent=dialog)
+            buttons.rejected.connect(dialog.reject)
+            layout.addWidget(buttons)
+
+            dialog.resize(420, 300)
+            dialog.exec()
+        except Exception as e:
+            self._print_to_terminal(f"[Symbols] Error al generar tabla de símbolos:\n{e}")

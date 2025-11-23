@@ -294,3 +294,6 @@ class Ui_snaptics(object):
         # Acciones de terminal
         self.actionNew_Terminal.setText(_translate("snaptics", "Terminal"))
         self.actionNew_Terminal.setShortcut(_translate("snaptics", "Ctrl+J"))
+    
+
+
