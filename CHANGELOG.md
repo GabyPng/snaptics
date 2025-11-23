@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 This project adheres to the "Keep a Changelog" format and uses Semantic Versioning.
 
+## [v1.2.0] - 2025-11-23
+### Agregado
+- Manejo de errores léxicos avanzado: reporta línea, columna, texto de la línea y flecha apuntando al error (`lexer.py`).
+- Detección específica de cadenas no cerradas con mensaje "Cadena no cerrada" usando `match-case` en `t_error()`.
+- Funciones `format_errors()` y `print_errors()` para formatear errores en GUI y consola.
+- Integración de errores en la interfaz gráfica: muestra errores en la terminal integrada y oculta el panel de tokens si hay errores.
+
+### Cambiado
+- Mensajes de error en español para consistencia.
+- `ui/main_window.py`: `_run_lexer()` ahora verifica errores y muestra solo errores o tokens según corresponda.
+
+
 ## [v1.1.0] - 2025-11-12
 ### Agregado
 - Panel de Tokens (dockable) con tabla ordenable y filtrable (`ui/tokens_panel.py`). Atajo: `Ctrl+T`.

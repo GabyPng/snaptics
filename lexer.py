@@ -14,7 +14,6 @@ import re
         indicar que define un toquen 
         Las palabras reservadas deben escribirse 
    
-   
    TODO:
    QSyntaxHighlighter Para resaltar Tokens o errores     
 """
@@ -92,26 +91,38 @@ tokens = [
     
     'INT',
     'REAL',
-    'BOOL',
     'STRING'
     
 ] + list(reserved.values())
 
 t_ignore  = ' \t'
+
+def t_COMMENT(t):
+    r'\#.*'
+    pass
+    # No return value. Token discarded
+
+def t_COMENTARIO_BLOQUE(t):
+    r'/\*([^*]|\*+[^*/])*\*/'
+    t.lexer.lineno += t.value.count('\n')
+    pass
+
+
 t_LPAREN = r'\('
 t_RPAREN = r'\)'
 t_ADD = r'\+'
 t_SUB = r'-'
 t_MUL = r'\*'
 t_DIV = r'/'
-t_ASIG = r'='
 t_EQ = r'=='
-t_NEQ = r'\!='
-t_LEQ = r'\<='
-t_GEQ = r'\>='
-t_LESSTHAN = r'\<'
-t_GREATERTHAN = r'\>'
-# Operador de implicación/condición estilo Prolog
+t_NEQ = r'!='
+t_LEQ = r'<='
+t_GEQ = r'>='
+t_LESSTHAN = r'<'
+t_GREATERTHAN = r'>'
+t_ASIG = r'='
+
+# Operador de implicación/condición
 t_COND = r':-'
 t_RANGE = r'\.\.'
 
@@ -135,10 +146,11 @@ def t_STRING(t):
     t.value = t.value[1:-1]  # remove quotes
     return t
 
-def t_BOOL(t):
-    r'(true|false)'
-    t.value = True if t.value == 'true' else False
-    return t
+
+# def t_BOOL(t):
+#     r'(true|false)'
+#     t.value = True if t.value == 'true' else False
+#     return t
 
 # Cuenta las líenas para trackearlas
 def t_newline(t):
@@ -152,111 +164,106 @@ def find_column(input, token):
     line_start = input.rfind('\n', 0, token.lexpos) + 1
     return (token.lexpos - line_start) + 1
 
+lex_errors = []
+
 def t_error(t):
-    print("Illegal character '%s'" % t.value[0])
+    line = t.lexer.lineno
+    column = find_column(t.lexer.lexdata, t)
+    lines = t.lexer.lexdata.splitlines()
+    line_text = lines[line - 1] if line - 1 < len(lines) else ""
+    
+    match t.value:
+        case value if value.startswith('"') and not value.endswith('"'):
+            message = "Cadena no cerrada"
+        case _:
+            message = f"Carácter ilegal '{t.value[0]}'"
+    
+    error = {
+        'line': line,
+        'column': column,
+        'line_text': line_text,
+        'message': message
+    }
+    t.lexer.errors.append(error)
     t.lexer.skip(1)
-
-def t_COMMENT(t):
-    r'\#.*'
-    pass
-    # No return value. Token discarded
-
-def t_COMENTARIO_BLOQUE(t):
-    r'/\*(.|\n)*?\*/'
-    t.lexer.lineno += t.value.count('\n') 
-    pass 
-
 
 def make_lexer():
     """Construye y devuelve una instancia de lexer PLY para este módulo."""
-    # PLY espera un objeto de módulo (no solo globals()).
-    return lex.lex(module=sys.modules[__name__])
-
+    return lex.lex(
+        module=sys.modules[__name__],
+        optimize=False,
+        debug=False
+    )
 
 def tokenize(text: str) -> Dict[str, Any]:
-    """Tokeniza el texto y devuelve los tokens y mensajes.
-
-    Retorno:
-    - {
-        'tokens': List[{ 'type', 'value', 'line', 'column', 'lexpos' }],
-        'output': str  # mensajes (incluye errores impresos por t_error)
-      }
-      
-    Tipo de token, Valor del token, ,NUMERO DE LÍNEA, COLUMNA
-    print(tok.type, tok.value, tok.lineno, tok.lexpos)
-    
-    """
     lexer = make_lexer()
+    lexer.errors = []
     lexer.input(text)
 
-    buf = io.StringIO()
-    tokens: List[Dict[str, Any]] = []
-    # Patrones para recuperar el lexema exacto a partir de lexpos
-    real_re = re.compile(r'\d+\.\d+([eE][-+]?\d+)?')
-    int_re = re.compile(r'\d+')
-    str_re = re.compile(r'\"([^\\\"]|\\.)*\"')
-    bool_re = re.compile(r'(true|false)')
+    tokens = []
 
-    with contextlib.redirect_stdout(buf):
-        while True:
-            tok = lexer.token()
-            if not tok:
-                break
-            col = find_column(text, tok)
-            # Calcular longitud exacta del lexema
-            length = None
-            slice_from = text[tok.lexpos:] # Slicing con el metodo lexpos hasta donde termine el token
-            if tok.type == 'REAL':
-                m = real_re.match(slice_from)
-                if m:
-                    length = len(m.group(0))
-            elif tok.type == 'INT':
-                m = int_re.match(slice_from)
-                if m:
-                    length = len(m.group(0))
-            elif tok.type == 'STRING':
-                m = str_re.match(slice_from)
-                if m:
-                    length = len(m.group(0))
-            elif tok.type == 'BOOL':
-                m = bool_re.match(slice_from)
-                if m:
-                    length = len(m.group(0))
-            # Fallback: usar la representación actual del valor
-            if length is None:
-                try:
-                    length = len(str(tok.value))
-                except Exception:
-                    length = 1
+    while True:
+        tok = lexer.token()
+        if not tok:
+            break
 
-            lexeme = slice_from[:length]
-            tokens.append({
-                'type': tok.type,
-                'value': tok.value,
-                'line': tok.lineno,
-                'column': col,
-                'lexpos': tok.lexpos, # índice absoluto del inicio del token en el texto
-                'length': length, # longitud exacta del lexema en el texto.
-                'lexeme': lexeme, #el texto original del lexema 
-            })
+        start = tok.lexpos
+        end = lexer.lexpos
+        lexeme = text[start:end]
 
-    return {'tokens': tokens, 'output': buf.getvalue()}
+        tokens.append({
+            'type': tok.type,
+            'value': tok.value,
+            'line': tok.lineno,
+            'column': find_column(text, tok),
+            'lexpos': tok.lexpos,
+            'lexeme': lexeme,
+            'length': len(lexeme)
+        })
 
+    return {
+        'tokens': tokens,
+        'errors': lexer.errors,
+        'output': ""  
+    }
+
+
+def print_errors(errors: List[Dict[str, Any]]):
+    """
+        Imprime los errores de manera formateada con línea, columna, texto y flecha.
+        Esto sirve para ver la salida del lexer directamente, descomentando el código de main y en 
+        code poner el códgo directamente. Sirve para debuggear
+    """
+    for error in errors:
+        print(f"Error léxico en línea {error['line']}, columna {error['column']}: {error['message']}")
+        print(f"  {error['line_text']}")
+        print(f"  {' ' * (error['column'] - 1)}^")
+
+def format_errors(errors: List[Dict[str, Any]]) -> str:
+    """Devuelve una cadena formateada con los errores para la interfaz del compilador"""
+    if not errors:
+        return ""
+    lines = []
+    for error in errors:
+        lines.append(f"Error léxico en línea {error['line']}, columna {error['column']}: {error['message']}")
+        lines.append(f"  {error['line_text']}")
+        lines.append(f"  {' ' * (error['column'] - 1)}^")
+        lines.append("")  # blank line between errors
+    return "\n".join(lines)
 
 if __name__ == '__main__':
+    # Ejemplo de uso
+#     code = """    import dataset ventas from "ventas.csv"
+#     fact ventas_altas = P(ventas > 500) = 0.72
+#     rule baja_rentabilidad :- ventas_altas < 0.5 and margen_bajo > 0.3
+#     query rentabilidad_general ¿ ?$%mis_datoa
+# """
+#     result = tokenize(code)
+#     print("Tokens:")
+#     for token in result['tokens']:
+#         print(token)
+#     print("\nErrores:")
+#     print_errors(result['errors'])
+#     print("\nMensajes:")
+#     print(result['output'])
     pass
-# Tienes que ejecutar la clase main.py
-"""
-    sample = (
-        'import dataset ventas from "ventas.csv"\n'
-        'fact ventas_altas = P(ventas> 500) = 0.72\n'
-        'rule baja_rentabilidad :- ventas_altas < 0.5 and margen_bajo > 0.3\n'
-        'query rentabilidad_general\n'
-    )
-    result = tokenize(sample)
-    for t in result['tokens']:
-        print(t['type'], t['value'], t['line'], t['column'])
-    if result['output']:
-        print('\nMensajes del lexer:')
-        print(result['output'])
-"""

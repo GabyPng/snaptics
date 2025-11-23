@@ -5,7 +5,7 @@ snaptics
 
 from PyQt6 import QtCore, QtWidgets, QtGui
 import traceback
-import lexer
+import lexer # NO MOVER !!
 from .ui_base import Ui_snaptics
 from .tokens_panel import TokensPanel
 from .terminal_controller import TerminalController
@@ -134,32 +134,41 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
             self._print_to_terminal("[Lexer] Analizando tokens...\n")
             result = lexer.tokenize(text)
 
-            # Formatear salida
-            lines = []
-            header = f"{'LINE':>4} {'COL':>4} {'TYPE':<20} VALUE"
-            lines.append(header)
-            lines.append('-' * len(header))
-            for t in result['tokens']:
-                # Representar valores largos de forma compacta
-                val = t['value']
-                sval = repr(val)
-                if len(sval) > 60:
-                    sval = sval[:57] + '...'
-                lines.append(f"{t['line']:>4} {t['column']:>4} {t['type']:<20} {sval}")
+            if result['errors']:
+                # Mostrar errores y no mostrar tokens
+                error_output = lexer.format_errors(result['errors'])
+                self._print_to_terminal(f"[Errores encontrados]\n{error_output}")
+                # Limpiar y ocultar panel de tokens
+                if hasattr(self, 'tokens_panel'):
+                    self.tokens_panel.clear()
+                    self.tokens_dock.hide()
+            else:
+                # Formatear salida de tokens
+                lines = []
+                header = f"{'LINE':>4} {'COL':>4} {'TYPE':<20} VALUE"
+                lines.append(header)
+                lines.append('-' * len(header))
+                for t in result['tokens']:
+                    # Representar valores largos de forma compacta
+                    val = t['value']
+                    sval = repr(val)
+                    if len(sval) > 60:
+                        sval = sval[:57] + '...'
+                    lines.append(f"{t['line']:>4} {t['column']:>4} {t['type']:<20} {sval}")
 
-            output = "\n".join(lines)
-            if not result['tokens']:
-                output += "\n(Sin tokens)"
-            if result.get('output'):
-                output += "\n\n[Mensajes del lexer]\n" + result['output']
+                output = "\n".join(lines)
+                if not result['tokens']:
+                    output += "\n(Sin tokens)"
+                if result.get('output'):
+                    output += "\n\n[Mensajes del lexer]\n" + result['output']
 
-            self._print_to_terminal(output)
+                self._print_to_terminal(output)
 
-            # Actualizar panel de tokens
-            if hasattr(self, 'tokens_panel'):
-                self.tokens_panel.set_tokens(result['tokens'])
-                if result['tokens']:
-                    self.tokens_dock.show()
+                # Actualizar panel de tokens
+                if hasattr(self, 'tokens_panel'):
+                    self.tokens_panel.set_tokens(result['tokens'])
+                    if result['tokens']:
+                        self.tokens_dock.show()
         except Exception as e:
             self._print_to_terminal("[Error] Falló el análisis léxico:\n" + str(e) + "\n" + traceback.format_exc())
 
