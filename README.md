@@ -6,8 +6,8 @@ Integración de la interfaz desarrollada en QT Designer e importada en python. S
 
 ## Instalación y Uso
 
+### OPCIÓN 1
 Para colaborar en este proyecto, configuren el entorno de desarrollo con conda:
-
 ```bash
 conda create -n snaptics python=3.11 ply pandas numpy scipy matplotlib seaborn jupyterlab
 conda activate snaptics
@@ -15,9 +15,10 @@ conda activate snaptics
 
 Después instalan PyQt6:
 ```bash
-conda install PyQt6
+pip install PyQt6
 ```
 
+### OPCIÓN 2
 Con pip 
 ```bash
 python -m venv .venv
