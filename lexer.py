@@ -13,7 +13,6 @@ import re
         Cada de una de estas reglas estan definidas por declaraciones con el prefijo t_ para
         indicar que define un toquen 
         Las palabras reservadas deben escribirse 
-   
    TODO:
    QSyntaxHighlighter Para resaltar Tokens o errores     
 """
