@@ -33,19 +33,19 @@ reserved = {
     'fact': 'FACT',
     'rule': 'RULE',
     'query': 'QUERY',
-    'infer': 'INFER',
-    'explain': 'EXPLAIN',
     'evidence': 'EVIDENCE',
     'confidence': 'CONFIDENCE',
 
     # Probabilidad y estadística
     'P': 'PROB',
-    'probability': 'PROBABILITY',
     'distribution': 'DISTRIBUTION',
     'mean': 'MEAN',
     'var': 'VAR',
     'std': 'STD',
     'correlation': 'CORRELATION',
+
+    # Explicabilidad
+    'explain': 'EXPLAIN',
 
     # Conectores y lógica
     'and': 'AND',
@@ -55,10 +55,6 @@ reserved = {
     'then': 'THEN',
     'else': 'ELSE',
     'given': 'GIVEN',
-
-    # Explicabilidad
-    'why': 'WHY',
-    'because': 'BECAUSE',
 
     # Booleanos
     'true': 'TRUE',
@@ -88,6 +84,8 @@ tokens = [
     'ASIG', # =
     'COND', # :=
     'RANGE', # ..
+    'COMMA', # ,
+    'DOT', # .
     
     'INT',
     'REAL',
@@ -126,9 +124,11 @@ t_ASIG = r'='
 # Operador de implicación/condición
 t_COND = r':-'
 t_RANGE = r'\.\.'
+t_COMMA = r','
+t_DOT = r'\.'
 
 def t_ID(t):
-    r'[A-Za-z_][A-Za-z_0-9]*'
+    r'[A-Za-z_][A-Za-z_0-9.]*'
     t.type = reserved.get(t.value,'ID')    # Check for reserved words
     return t
 

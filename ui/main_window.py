@@ -22,6 +22,8 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
         # Configurar interfaz base
         self.ui = Ui_snaptics()
         self.ui.setupUi(self)
+        # Reemplazar el editor por uno con soporte de números de línea
+        self._install_code_editor()
         
         # Inicializar controladores modulares
         self._init_controllers()
@@ -42,6 +44,123 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
         
         # Conectar detección de cambios en el texto
         self.ui.code_txt.textChanged.connect(self.file_manager.mark_modified)
+        
+        # Conectar resaltado de ocurrencias en selección
+        self.ui.code_txt.selectionChanged.connect(self._highlight_occurrences)
+
+    def _install_code_editor(self):
+        """Reemplaza el QPlainTextEdit generado por la UI con nuestro CodeEditor que
+        soporta numeración de líneas y otras utilidades."""
+        # Import aquí para evitar ciclos si se importa UI antes
+        class LineNumberArea(QtWidgets.QWidget):
+            def __init__(self, editor):
+                super().__init__(editor)
+                self.editor = editor
+
+            def sizeHint(self):
+                return QtCore.QSize(self.editor.lineNumberAreaWidth(), 0)
+
+            def paintEvent(self, event):
+                self.editor.lineNumberAreaPaintEvent(event)
+
+        class CodeEditor(QtWidgets.QPlainTextEdit):
+            def __init__(self, parent=None):
+                super().__init__(parent)
+                self.lineNumberArea = LineNumberArea(self)
+                self.blockCountChanged.connect(self.updateLineNumberAreaWidth)
+                self.updateRequest.connect(self.updateLineNumberArea)
+                self.cursorPositionChanged.connect(self._cursorMoved)
+                self._current_extra_line = None
+                self.updateLineNumberAreaWidth(0)
+
+            def lineNumberAreaWidth(self):
+                digits = len(str(max(1, self.blockCount())))
+                space = 3 + self.fontMetrics().horizontalAdvance('9') * digits
+                return space
+
+            def updateLineNumberAreaWidth(self, _):
+                self.setViewportMargins(self.lineNumberAreaWidth(), 0, 0, 0)
+                self.lineNumberArea.setFixedWidth(self.lineNumberAreaWidth())
+
+            def updateLineNumberArea(self, rect, dy):
+                if dy:
+                    self.lineNumberArea.scroll(0, dy)
+                else:
+                    self.lineNumberArea.update(0, rect.y(), self.lineNumberArea.width(), rect.height())
+
+                if rect.contains(self.viewport().rect()):
+                    self.updateLineNumberAreaWidth(0)
+
+            def resizeEvent(self, event):
+                super().resizeEvent(event)
+                cr = self.contentsRect()
+                self.lineNumberArea.setGeometry(QtCore.QRect(cr.left(), cr.top(), self.lineNumberAreaWidth(), cr.height()))
+
+            def lineNumberAreaPaintEvent(self, event):
+                painter = QtGui.QPainter(self.lineNumberArea)
+                painter.fillRect(event.rect(), QtGui.QColor(240, 240, 240))
+                block = self.firstVisibleBlock()
+                blockNumber = block.blockNumber()
+                top = int(self.blockBoundingGeometry(block).translated(self.contentOffset()).top())
+                bottom = top + int(self.blockBoundingRect(block).height())
+                fm = self.fontMetrics()
+                width = self.lineNumberArea.width()
+                while block.isValid() and top <= event.rect().bottom():
+                    if block.isVisible() and bottom >= event.rect().top():
+                        number = str(blockNumber + 1)
+                        painter.setPen(QtGui.QColor(80, 80, 80))
+                        painter.drawText(0, top, width - 4, fm.height(), QtCore.Qt.AlignmentFlag.AlignRight, number)
+                    block = block.next()
+                    top = bottom
+                    bottom = top + int(self.blockBoundingRect(block).height())
+                    blockNumber += 1
+
+            def _cursorMoved(self):
+                # Mark line to be included when merging extra selections
+                cur = self.textCursor()
+                block = cur.block()
+                sel = QtWidgets.QTextEdit.ExtraSelection()
+                # Determine theme via the main window's theme_manager
+                main_win = self.window()
+                theme_manager = getattr(main_win, 'theme_manager', None)
+                is_dark = False
+                if theme_manager and hasattr(theme_manager, 'get_current_theme'):
+                    is_dark = (theme_manager.get_current_theme() == 'dark')
+                lineColor = QtGui.QColor(220, 235, 255) if not is_dark else QtGui.QColor(50, 50, 70)
+                sel.format.setBackground(lineColor)
+                sel.cursor = cur
+                sel.cursor.select(QtGui.QTextCursor.SelectionType.LineUnderCursor)
+                self._current_extra_line = sel
+
+            def mergeExtraSelections(self, extras):
+                # Combine the provided extras (e.g. occurrences) with current line highlight
+                merged = list(extras) if extras else []
+                if self._current_extra_line:
+                    merged.append(self._current_extra_line)
+                return merged
+
+        # Replace the widget instance in-place
+        old = self.ui.code_txt
+        parent = old.parent()
+        if parent is None:
+            return
+        new_editor = CodeEditor(parent)
+        new_editor.setObjectName('code_txt')
+        new_editor.setPlainText(old.toPlainText())
+        # Copy font, tab stops and other properties
+        new_editor.setFont(old.font())
+        new_editor.setTabStopDistance(old.tabStopDistance())
+        # Find and replace within parent layout
+        layout = parent.layout()
+        if layout is not None:
+            for i in range(layout.count()):
+                it = layout.itemAt(i)
+                if it is not None and it.widget() is old:
+                    layout.insertWidget(i, new_editor)
+                    layout.removeWidget(old)
+                    old.setParent(None)
+                    break
+        self.ui.code_txt = new_editor
     
     def _connect_signals(self):
         """Conectar todas las señales de la interfaz"""
@@ -224,11 +343,12 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
         """Mostrar información sobre la aplicación"""
         about_text = """<h3>snaptics</h3>
         <p><b>Compilador del equipo #2</b></p>
-        <p>Versión 1.0</p>
+        <p>Versión 1.3.0</p>
 
         <h4>Atajos principales:</h4>
         <ul>
             <li><b>Ctrl+J</b> - Alternar terminal</li>
+            <li><b>Ctrl+J</b> - Alternar tabla de Tokens</li>
             <li><b>F12</b> - Alternar tema</li>
         </ul>
         
@@ -311,3 +431,36 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
             dialog.exec()
         except Exception as e:
             self._print_to_terminal(f"[Symbols] Error al generar tabla de símbolos:\n{e}")
+    
+    def _highlight_occurrences(self):
+        """Resaltar todas las ocurrencias del texto seleccionado."""
+        cursor = self.ui.code_txt.textCursor()
+        if cursor.hasSelection():
+            selected_text = cursor.selectedText()
+            if selected_text.strip():
+                # Buscar todas las ocurrencias en el documento
+                document = self.ui.code_txt.document()
+                extra_selections = []
+                search_cursor = QtGui.QTextCursor(document)
+                
+                # Usar azul claro semi-transparente para mejor visibilidad en ambos temas
+                highlight_color = QtGui.QColor(100, 200, 255, 150)
+                
+                while not search_cursor.isNull() and not search_cursor.atEnd():
+                    search_cursor = document.find(selected_text, search_cursor)
+                    if not search_cursor.isNull():
+                        selection = QtWidgets.QTextEdit.ExtraSelection()
+                        selection.format.setBackground(highlight_color)
+                        selection.cursor = search_cursor
+                        extra_selections.append(selection)
+
+                # Merge with any editor-provided extras (e.g. current-line highlight)
+                if hasattr(self.ui.code_txt, 'mergeExtraSelections'):
+                    merged = self.ui.code_txt.mergeExtraSelections(extra_selections)
+                    self.ui.code_txt.setExtraSelections(merged)
+                else:
+                    self.ui.code_txt.setExtraSelections(extra_selections)
+            else:
+                self.ui.code_txt.setExtraSelections([])
+        else:
+            self.ui.code_txt.setExtraSelections([])

@@ -3,16 +3,27 @@
 All notable changes to this project will be documented in this file.
 This project adheres to the "Keep a Changelog" format and uses Semantic Versioning.
 
-## [v1.2.0] - 2025-11-23
+## [v1.3.0] - 2025-11-23
 ### Agregado
+- Nuevos tokens: `COMMA` (`,`) y `DOT` (`.`) para permitir comas y puntos en expresiones.
+- Soporte para puntos en identificadores (IDs con `.`), modificando la regex de `t_ID`.
+- Función `categorize_char_error()` para categorizar errores léxicos con mensajes más descriptivos.
+- Mejoras en `t_error()` con casos especiales para cadenas no cerradas, comentarios de bloque incompletos y operadores incompletos.
 - Manejo de errores léxicos avanzado: reporta línea, columna, texto de la línea y flecha apuntando al error (`lexer.py`).
 - Detección específica de cadenas no cerradas con mensaje "Cadena no cerrada" usando `match-case` en `t_error()`.
 - Funciones `format_errors()` y `print_errors()` para formatear errores en GUI y consola.
 - Integración de errores en la interfaz gráfica: muestra errores en la terminal integrada y oculta el panel de tokens si hay errores.
+- Resaltado de ocurrencias: al seleccionar texto en el editor, se iluminan todas las ocurrencias con fondo amarillo.
+- Números de línea: ahora el editor muestra números de línea en el margen izquierdo (CodeEditor con LineNumberArea).
 
 ### Cambiado
-- Mensajes de error en español para consistencia.
+- Regex de `t_ID` actualizada para requerir contenido válido después de puntos: `r'[A-Za-z_][A-Za-z_0-9]*(\.[A-Za-z_][A-Za-z_0-9]*)*'`, evitando IDs que terminen con punto.
+- Mensajes de error más específicos y en español.
 - `ui/main_window.py`: `_run_lexer()` ahora verifica errores y muestra solo errores o tokens según corresponda.
+
+### Archivos más relevantes modificados
+- `lexer.py` (nuevos tokens, regex de ID, categorización de errores)
+- `ui/main_window.py` (integración de errores, resaltado de ocurrencias)
 
 
 ## [v1.1.0] - 2025-11-12
