@@ -6,12 +6,12 @@ import sys
 import re
 
 """
-    Como construír nuextro léxico:
-        Se tiene que escribír un conjunto de cada nombre de los tokens,
-        Por cada toquen escrito en el conjunto, se representa ocn una expresión regular,
+    Como construír nuestro léxico:
+        Se tiene que escribir un conjunto de cada nombre de los tokens,
+        Por cada token escrito en el conjunto, se representa con una expresión regular,
         compatible con re module de python.
-        Cada de una de estas reglas estan definidas por declaraciones con el prefijo t_ para
-        indicar que define un toquen 
+        Cada de una de estas reglas están definidas por declaraciones con el prefijo t_ para
+        indicar que define un token 
         Las palabras reservadas deben escribirse 
    TODO:
    QSyntaxHighlighter Para resaltar Tokens o errores     
@@ -76,6 +76,7 @@ tokens = [
     'SUB',
     'MUL',
     'DIV',
+    'POW',
     
     'EQ',
     'NEQ',
@@ -113,6 +114,7 @@ t_ADD = r'\+'
 t_SUB = r'-'
 t_MUL = r'\*'
 t_DIV = r'/'
+t_POW = r'\^'
 t_EQ = r'=='
 t_NEQ = r'!='
 t_LEQ = r'<='
@@ -163,19 +165,122 @@ def find_column(input, token):
     line_start = input.rfind('\n', 0, token.lexpos) + 1
     return (token.lexpos - line_start) + 1
 
-lex_errors = []
+
+def categorize_char_error(char, line_text, column):
+    """
+    Categoriza el tipo de error léxico según el carácter.
+    
+    Args:
+        char: El carácter ilegal
+        line_text: Texto de la línea completa
+        column: Posición de la columna
+    
+    Returns:
+        String con el mensaje de error categorizado
+    """
+    # Signos de puntuación español
+    if char in '¿¡':
+        return f"Signo de puntuación español no permitido '{char}'"
+    
+    # Símbolos especiales comunes
+    elif char == '@':
+        return f"Símbolo '@' no válido (solo permitido dentro de cadenas)"
+    
+    elif char == '$':
+        return f"Símbolo '$' no permitido (use el nombre de la moneda o cadenas)"
+    
+    elif char == '%':
+        return f"Símbolo '%' no es un operador válido"
+    
+    # Delimitadores no soportados
+    elif char in '[]':
+        return f"Corchetes '{char}' no están soportados (use paréntesis)"
+    
+    elif char in '{}':
+        return f"Llaves '{char}' no están soportadas (use paréntesis para agrupar)"
+    
+    # Operadores lógicos incorrectos
+    elif char == '|':
+        return f"Operador '|' no válido (use 'or' para operaciones lógicas)"
+    
+    elif char == '||':
+        return f"Operador '||' no válido (use 'or' para operaciones lógicas)"
+    
+    elif char == '&':
+        return f"Operador '&' no válido (use 'and' para operaciones lógicas)"
+    
+    elif char == '&&':
+        return f"Operador '&&' no válido (use 'and' para operaciones lógicas)"
+    
+    # Punto y coma innecesario
+    elif char == ';':
+        return f"Punto y coma ';' no es necesario (no se requieren terminadores de línea)"
+    
+    # Barra invertida fuera de cadena
+    elif char == '\\':
+        return f"Barra invertida '\\' solo válida dentro de cadenas"
+    
+    # Caracteres con acento
+    elif char in 'áéíóúÁÉÍÓÚñÑ':
+        base = {'á':'a', 'é':'e', 'í':'i', 'ó':'o', 'ú':'u',
+                'Á':'A', 'É':'E', 'Í':'I', 'Ó':'O', 'Ú':'U',
+                'ñ':'n', 'Ñ':'N'}
+        replacement = base.get(char, char)
+        return f"Carácter acentuado '{char}' no válido (use '{replacement}' sin acento)"
+    
+    # Otros caracteres Unicode
+    elif ord(char) > 127:
+        return f"Carácter Unicode '{char}' no permitido (código: {ord(char)})"
+    
+    # Caracteres de control
+    elif ord(char) < 32 and char not in '\n\t\r':
+        return f"Carácter de control no válido (código ASCII: {ord(char)})"
+    
+    # Backticks y tildes
+    elif char in '`~':
+        return f"Carácter '{char}' no es válido en este lenguaje"
+    
+    # Carácter por defecto
+    else:
+        return f"Carácter ilegal '{char}'"
+
 
 def t_error(t):
+    """Maneja errores léxicos con categorización detallada."""
     line = t.lexer.lineno
     column = find_column(t.lexer.lexdata, t)
     lines = t.lexer.lexdata.splitlines()
     line_text = lines[line - 1] if line - 1 < len(lines) else ""
     
-    match t.value:
-        case value if value.startswith('"') and not value.endswith('"'):
-            message = "Cadena no cerrada"
-        case _:
-            message = f"Carácter ilegal '{t.value[0]}'"
+    char = t.value[0]
+    message = None
+    
+    # Caso especial 1: Cadena no cerrada
+    if char == '"':
+        rest_of_line = line_text[column - 1:]
+        # Si solo hay una comilla en lo que resta de línea, probablemente no está cerrada
+        if rest_of_line.count('"') == 1:
+            message = "Cadena no cerrada (falta comilla de cierre)"
+        else:
+            message = "Error en cadena de texto (verifique las comillas)"
+    
+    # Caso especial 2: Comentario de bloque no cerrado
+    elif t.value.startswith('/*'):
+        rest_of_text = t.lexer.lexdata[t.lexpos:]
+        if '*/' not in rest_of_text:
+            message = "Comentario de bloque sin cierre (falta */)"
+        else:
+            message = "Error en comentario de bloque"
+    
+    # Caso especial 3: Operador '!' incompleto
+    elif char == '!' and column < len(line_text):
+        next_char = line_text[column] if column < len(line_text) else ''
+        if next_char != '=':
+            message = "Operador '!' incompleto (use '!=' para desigualdad o 'not' para negación)"
+    
+    # Categorización por carácter
+    if not message:
+        message = categorize_char_error(char, line_text, column)
     
     error = {
         'line': line,
@@ -229,9 +334,9 @@ def tokenize(text: str) -> Dict[str, Any]:
 
 def print_errors(errors: List[Dict[str, Any]]):
     """
-        Imprime los errores de manera formateada con línea, columna, texto y flecha.
-        Esto sirve para ver la salida del lexer directamente, descomentando el código de main y en 
-        code poner el códgo directamente. Sirve para debuggear
+    Imprime los errores de manera formateada con línea, columna, texto y flecha.
+    Esto sirve para ver la salida del lexer directamente, descomentando el código de main y en 
+    code poner el código directamente. Sirve para debuggear
     """
     for error in errors:
         print(f"Error léxico en línea {error['line']}, columna {error['column']}: {error['message']}")
@@ -265,4 +370,35 @@ if __name__ == '__main__':
 #     print_errors(result['errors'])
 #     print("\nMensajes:")
 #     print(result['output'])
+    #Ejemplo de errores
+    # code = """
+    # # Prueba de análisis léxico
+    # fact ventas_altas = P(ventas > 500) = 0.72
+
+    # # Errores de caracteres especiales
+    # rule análisis@ :- precio$ < 100 and margen% > 0.3
+
+    # # Operadores incorrectos
+    # resultado = verdadero & falso | otro
+
+    # # Símbolos españoles
+    # pregunta¿ = true
+    # valor¡ = 123
+
+    # # Cadena no cerrada
+    # nombre = "esto no cierra
+
+    # # Caracteres raros
+    # variable` = 10
+    # otro~ = 20
+    # """
+    # result = tokenize(code)
+    # print("Tokens:")
+    # for token in result['tokens']:
+    #     print(token)
+    # print("\nErrores:")
+    # print_errors(result['errors'])
+    # print("\nMensajes:")
+    # print(result['output'])
+
     pass
