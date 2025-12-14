@@ -46,6 +46,7 @@ reserved = {
 
     # Explicabilidad
     'explain': 'EXPLAIN',
+    'why': 'WHY',
 
     # Conectores y lógica
     'and': 'AND',

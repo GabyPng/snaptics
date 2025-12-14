@@ -6,11 +6,13 @@ snaptics
 from PyQt6 import QtCore, QtWidgets, QtGui
 import traceback
 import lexer # NO MOVER !!
+import parser as syntax_parser
 from .ui_base import Ui_snaptics
 from .tokens_panel import TokensPanel
 from .terminal_controller import TerminalController
 from .file_manager import FileManager
 from .theme_manager import ThemeManager
+
 
 
 class SnapticsMainWindow(QtWidgets.QMainWindow):
@@ -186,7 +188,7 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
         self.ui.actionDark.triggered.connect(self.theme_manager.apply_dark_theme)
         self.ui.actionLight.triggered.connect(self.theme_manager.apply_light_theme)
 
-        # Señales de compilación/analizador léxico
+        # Señales de compilación
         self.ui.actionCompile.triggered.connect(self._run_lexer)
         # View > Tokens: mostrar/ocultar panel de tokens
         self.ui.actionTokens.triggered.connect(self._toggle_tokens_panel)
@@ -243,62 +245,237 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
         self.tokens_dock.hide()
 
     def _run_lexer(self):
-        """Ejecutar el analizador léxico sobre el texto del editor y mostrar resultados."""
+        """Ejecutar análisis léxico y sintáctico completo (compilación)."""
         try:
             text = self.ui.code_txt.toPlainText()
             if not text.strip():
-                self._print_to_terminal("[Lexer] No hay contenido para analizar.")
-                # Limpiar la tabla si no hay contenido
+                self._print_to_terminal("[Compiler] No hay contenido para analizar.")
                 if hasattr(self, 'tokens_panel'):
                     self.tokens_panel.clear()
                 return
 
-            self._print_to_terminal("[Lexer] Analizando tokens...\n")
-            result = lexer.tokenize(text)
-
-            # Guardar tokens para acceso posterior
+            # ========== ENCABEZADO DE COMPILACIÓN ==========
+            lines = []
+            lines.append("=" * 70)
+            lines.append("INICIANDO COMPILACIÓN")
+            lines.append("=" * 70)
+            lines.append("")
+            
+            # ========== FASE 1: ANÁLISIS LÉXICO ==========
+            lines.append("FASE 1: ANÁLISIS LÉXICO")
+            lines.append("-" * 70)
+            
+            lex_result = lexer.tokenize(text)
+            
+            # Guardar tokens para tabla de símbolos
             try:
-                self.last_tokens = result.get('tokens', []) if isinstance(result, dict) else []
+                self.last_tokens = lex_result.get('tokens', []) if isinstance(lex_result, dict) else []
             except Exception:
                 self.last_tokens = []
 
-            if result['errors']:
-                # Mostrar errores y no mostrar tokens
-                error_output = lexer.format_errors(result['errors'])
-                self._print_to_terminal(f"[Errores encontrados]\n{error_output}")
-                # Limpiar y ocultar panel de tokens
+            # Verificar errores léxicos
+            if lex_result['errors']:
+                lines.append("")
+                lines.append("✗ ERRORES LÉXICOS ENCONTRADOS")
+                lines.append("")
+                
+                # Imprimir lo que tenemos hasta ahora
+                self._print_to_terminal("\n".join(lines))
+                
+                # Agregar errores formateados
+                error_output = lexer.format_errors(lex_result['errors'])
+                self._print_to_terminal_append(error_output)
+                
+                lines_footer = []
+                lines_footer.append("")
+                lines_footer.append("⚠️  La compilación se detuvo en la fase léxica.")
+                lines_footer.append("   Corrija los errores antes de continuar.")
+                lines_footer.append("")
+                lines_footer.append("=" * 70)
+                self._print_to_terminal_append("\n".join(lines_footer))
+                
+                # Limpiar panel de tokens
                 if hasattr(self, 'tokens_panel'):
                     self.tokens_panel.clear()
                     self.tokens_dock.hide()
+                
+                # Mostrar diálogo de error
+                QtWidgets.QMessageBox.critical(
+                    self,
+                    "Error Léxico",
+                    f"Se encontraron {len(lex_result['errors'])} error(es) léxico(s).\n\n"
+                    f"Consulta la terminal para más detalles."
+                )
+                return
+            
+            # Mostrar resumen de tokens
+            num_tokens = len(lex_result['tokens'])
+            num_lines = text.count('\n') + 1
+            
+            lines.append("")
+            lines.append(f"✓ Análisis léxico completado")
+            lines.append(f"  Tokens generados: {num_tokens}")
+            lines.append(f"  Líneas procesadas: {num_lines}")
+            lines.append("")
+            
+            # Mostrar tabla de tokens
+            lines.append("Tokens identificados:")
+            lines.append("-" * 70)
+            header = f"{'LINE':>4} {'COL':>4} {'TYPE':<20} VALUE"
+            lines.append(header)
+            lines.append("-" * 70)
+            
+            for t in lex_result['tokens']:
+                val = t['value']
+                sval = repr(val)
+                if len(sval) > 40:
+                    sval = sval[:37] + '...'
+                lines.append(f"{t['line']:>4} {t['column']:>4} {t['type']:<20} {sval}")
+            
+            if not lex_result['tokens']:
+                lines.append("(Sin tokens)")
+            
+            lines.append("")
+            
+            # Actualizar panel de tokens
+            if hasattr(self, 'tokens_panel'):
+                self.tokens_panel.set_tokens(lex_result['tokens'])
+                if lex_result['tokens']:
+                    self.tokens_dock.show()
+            
+            # ========== FASE 2: ANÁLISIS SINTÁCTICO ==========
+            lines.append("")
+            lines.append("FASE 2: ANÁLISIS SINTÁCTICO")
+            lines.append("-" * 70)
+            
+            parse_result = syntax_parser.parse(text)
+            
+            if parse_result['success']:
+                # Análisis sintáctico exitoso
+                lines.append("")
+                lines.append(f"Análisis sintáctico completado")
+                lines.append(f"  Se generó el Árbol de Sintaxis Abstracta (AST)")
+                lines.append("")
+                
+                # Mostrar estructura del AST
+                lines.append("Estructura del AST:")
+                lines.append("-" * 70)
+                
+                # Imprimir lo que tenemos hasta ahora
+                self._print_to_terminal("\n".join(lines))
+                
+                # Capturar output del AST
+                import io
+                import sys
+                
+                ast_output = io.StringIO()
+                old_stdout = sys.stdout
+                sys.stdout = ast_output
+                syntax_parser.print_ast(parse_result['ast'])
+                sys.stdout = old_stdout
+                
+                self._print_to_terminal_append(ast_output.getvalue())
+                
+                # Guardar el AST para uso posterior
+                self.last_ast = parse_result['ast']
+                
+                # ========== RESUMEN FINAL ==========
+                lines_final = []
+                lines_final.append("")
+                lines_final.append("=" * 70)
+                lines_final.append("COMPILACIÓN EXITOSA")
+                lines_final.append("=" * 70)
+                lines_final.append("")
+                lines_final.append("Resumen:")
+                lines_final.append(f"  • Fase léxica:      {num_tokens} tokens")
+                lines_final.append(f"  • Fase sintáctica:  AST generado")
+                lines_final.append(f"  • Líneas analizadas: {num_lines}")
+                lines_final.append("")
+                lines_final.append("=" * 70)
+                
+                self._print_to_terminal_append("\n".join(lines_final))
+                
+                # Mostrar mensaje de éxito
+                QtWidgets.QMessageBox.information(
+                    self,
+                    "Compilación Exitosa",
+                    f"La compilación se completó sin errores.\n\n"
+                    f"• Análisis léxico: {num_tokens} tokens\n"
+                    f"• Análisis sintáctico: AST generado\n\n"
+                    f"Consulta la terminal para ver los detalles completos."
+                )
             else:
-                # Formatear salida de tokens
-                lines = []
-                header = f"{'LINE':>4} {'COL':>4} {'TYPE':<20} VALUE"
-                lines.append(header)
-                lines.append('-' * len(header))
-                for t in result['tokens']:
-                    # Representar valores largos de forma compacta
-                    val = t['value']
-                    sval = repr(val)
-                    if len(sval) > 60:
-                        sval = sval[:57] + '...'
-                    lines.append(f"{t['line']:>4} {t['column']:>4} {t['type']:<20} {sval}")
-
-                output = "\n".join(lines)
-                if not result['tokens']:
-                    output += "\n(Sin tokens)"
-                if result.get('output'):
-                    output += "\n\n[Mensajes del lexer]\n" + result['output']
-
-                self._print_to_terminal(output)
-
-                # Actualizar panel de tokens
-                if hasattr(self, 'tokens_panel'):
-                    self.tokens_panel.set_tokens(result['tokens'])
-                    if result['tokens']:
-                        self.tokens_dock.show()
+                # Hay errores sintácticos
+                num_errors = len(parse_result['errors'])
+                
+                lines.append("")
+                lines.append("✗ ERRORES SINTÁCTICOS ENCONTRADOS")
+                lines.append("")
+                
+                # Imprimir lo que tenemos hasta ahora
+                self._print_to_terminal("\n".join(lines))
+                
+                # Formatear errores de forma similar al lexer
+                error_lines = []
+                for i, error in enumerate(parse_result['errors'], 1):
+                    error_lines.append(f"[Error #{i}]")
+                    if error.get('line') == 'EOF':
+                        error_lines.append(f"  Posición: Final del archivo")
+                    else:
+                        error_lines.append(f"  Línea {error.get('line', '?')}, Columna {error.get('column', '?')}")
+                    
+                    token_type = error.get('token', '?')
+                    token_value = error.get('value', '')
+                    if token_value:
+                        error_lines.append(f"  Token problemático: '{token_value}' (tipo: {token_type})")
+                    else:
+                        error_lines.append(f"  Token problemático: {token_type}")
+                    
+                    error_lines.append(f"  Mensaje: {error.get('message', 'Error desconocido')}")
+                    error_lines.append("")
+                    error_lines.append("-" * 70)
+                    error_lines.append("")
+                
+                self._print_to_terminal_append("\n".join(error_lines))
+                
+                # ========== RESUMEN FINAL CON ERRORES ==========
+                lines_final = []
+                lines_final.append("")
+                lines_final.append("=" * 70)
+                lines_final.append("COMPILACIÓN FALLIDA")
+                lines_final.append("=" * 70)
+                lines_final.append("")
+                lines_final.append("Resumen:")
+                lines_final.append(f"  • Fase léxica:      ✓ {num_tokens} tokens")
+                lines_final.append(f"  • Fase sintáctica:  ✗ {num_errors} error(es)")
+                lines_final.append("")
+                lines_final.append("Corrija los errores sintácticos antes de continuar.")
+                lines_final.append("")
+                lines_final.append("=" * 70)
+                
+                self._print_to_terminal_append("\n".join(lines_final))
+                
+                # Mostrar diálogo con resumen
+                self._show_syntax_error_dialog(parse_result['errors'])
+                
         except Exception as e:
-            self._print_to_terminal("[Error] Falló el análisis léxico:\n" + str(e) + "\n" + traceback.format_exc())
+            error_msg = (
+                f"[ERROR CRÍTICO] Falló la compilación:\n\n"
+                f"{str(e)}\n\n"
+                f"Traceback:\n{traceback.format_exc()}"
+            )
+            self._print_to_terminal(error_msg)
+            QtWidgets.QMessageBox.critical(
+                self,
+                "Error Crítico",
+                f"Ocurrió un error inesperado durante la compilación:\n\n{str(e)}"
+            )
+
+    # Método auxiliar para agregar texto sin limpiar
+    def _print_to_terminal_append(self, text: str):
+        """Agregar texto a la terminal sin limpiar el contenido anterior."""
+        self.terminal_controller.show_terminal()
+        self.ui.terminal_txt.appendPlainText(text)
 
     def _print_to_terminal(self, text: str):
         """Escribir texto en la terminal integrada, limpiando previamente."""
@@ -347,6 +524,7 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
 
         <h4>Atajos principales:</h4>
         <ul>
+            <li><b>F9</b> - Compilar (Análisis Léxico + Sintáctico)</li>
             <li><b>Ctrl+J</b> - Alternar terminal</li>
             <li><b>Ctrl+J</b> - Alternar tabla de Tokens</li>
             <li><b>F12</b> - Alternar tema</li>
@@ -464,3 +642,169 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
                 self.ui.code_txt.setExtraSelections([])
         else:
             self.ui.code_txt.setExtraSelections([])
+    # def _run_parser(self):
+    #     """Ejecutar el analizador sintáctico sobre el texto del editor."""
+    #     try:
+    #         text = self.ui.code_txt.toPlainText()
+    #         if not text.strip():
+    #             self._print_to_terminal("[Parser] No hay contenido para analizar.")
+    #             return
+
+    #         self._print_to_terminal("[Parser] Analizando sintaxis...\n")
+            
+    #         # Primero ejecutar el lexer para verificar errores léxicos
+    #         lex_result = lexer.tokenize(text)
+            
+    #         if lex_result['errors']:
+    #             # Si hay errores léxicos, mostrarlos y no continuar
+    #             error_output = lexer.format_errors(lex_result['errors'])
+    #             self._print_to_terminal(f"[Errores léxicos encontrados]\n{error_output}")
+    #             self._print_to_terminal("\n⚠️  Corrija los errores léxicos antes de continuar con el análisis sintáctico.")
+    #             return
+            
+    #         # Si no hay errores léxicos, proceder con el parser
+    #         parse_result = syntax_parser.parse(text)
+            
+    #         if parse_result['success']:
+    #             # Análisis exitoso
+    #             lines = []
+    #             lines.append("=" * 70)
+    #             lines.append("ANÁLISIS SINTÁCTICO COMPLETADO CON ÉXITO")
+    #             lines.append("=" * 70)
+    #             lines.append("")
+    #             lines.append("✓ El código es sintácticamente correcto")
+    #             lines.append("✓ Se generó el Árbol de Sintaxis Abstracta (AST)")
+    #             lines.append("")
+    #             lines.append("-" * 70)
+    #             lines.append("ESTRUCTURA DEL AST:")
+    #             lines.append("-" * 70)
+    #             lines.append("")
+                
+    #             # Convertir AST a texto para mostrar
+    #             import io
+    #             import sys
+                
+    #             ast_output = io.StringIO()
+    #             old_stdout = sys.stdout
+    #             sys.stdout = ast_output
+    #             syntax_parser.print_ast(parse_result['ast'])
+    #             sys.stdout = old_stdout
+                
+    #             lines.append(ast_output.getvalue())
+    #             lines.append("")
+    #             lines.append("=" * 70)
+                
+    #             output = "\n".join(lines)
+    #             self._print_to_terminal(output)
+                
+    #             # Guardar el AST para uso posterior
+    #             self.last_ast = parse_result['ast']
+                
+    #             # Mostrar mensaje de éxito
+    #             QtWidgets.QMessageBox.information(
+    #                 self,
+    #                 "Análisis Sintáctico Exitoso",
+    #                 f"El código es sintácticamente correcto.\n\n"
+    #                 f"Se ha generado el Árbol de Sintaxis Abstracta.\n"
+    #                 f"Consulta la terminal para ver los detalles."
+    #             )
+    #         else:
+    #             # Hay errores sintácticos
+    #             num_errors = len(parse_result['errors'])
+                
+    #             lines = []
+    #             lines.append("=" * 70)
+    #             lines.append("ANÁLISIS SINTÁCTICO FALLIDO")
+    #             lines.append("=" * 70)
+    #             lines.append("")
+    #             lines.append(f"Total de errores encontrados: {num_errors}")
+    #             lines.append("")
+    #             lines.append("-" * 70)
+    #             lines.append("")
+                
+    #             # Formatear errores de forma similar al lexer
+    #             for i, error in enumerate(parse_result['errors'], 1):
+    #                 lines.append(f"[Error #{i}]")
+    #                 if error.get('line') == 'EOF':
+    #                     lines.append(f"  Posición: Final del archivo")
+    #                 else:
+    #                     lines.append(f"  Línea {error.get('line', '?')}, Columna {error.get('column', '?')}")
+                    
+    #                 token_type = error.get('token', '?')
+    #                 token_value = error.get('value', '')
+    #                 if token_value:
+    #                     lines.append(f"  Token problemático: '{token_value}' (tipo: {token_type})")
+    #                 else:
+    #                     lines.append(f"  Token problemático: {token_type}")
+                    
+    #                 lines.append(f"  Mensaje: {error.get('message', 'Error desconocido')}")
+    #                 lines.append("")
+    #                 lines.append("-" * 70)
+    #                 lines.append("")
+                
+    #             output = "\n".join(lines)
+    #             self._print_to_terminal(output)
+                
+    #             # Mostrar diálogo con resumen
+    #             self._show_syntax_error_dialog(parse_result['errors'])
+                
+    #     except Exception as e:
+    #         error_msg = (
+    #             f"[ERROR CRÍTICO] Falló el análisis sintáctico:\n\n"
+    #             f"{str(e)}\n\n"
+    #             f"Traceback:\n{traceback.format_exc()}"
+    #         )
+    #         self._print_to_terminal(error_msg)
+    #         QtWidgets.QMessageBox.critical(
+    #             self,
+    #             "Error Crítico",
+    #             f"Ocurrió un error inesperado durante el análisis:\n\n{str(e)}"
+    #         )
+
+    def _show_syntax_error_dialog(self, errors):
+        """Muestra un diálogo con los errores sintácticos."""
+        num_errors = len(errors)
+        
+        msg = f"""
+        <h3>Errores Sintácticos Detectados</h3>
+        <p><b>Total de errores:</b> <b style="color: #d32f2f;">{num_errors}</b></p>
+        
+        <p><b>Primeros errores:</b></p>
+        <table style="font-family: monospace; font-size: 11px;">
+        """
+        
+        for i, err in enumerate(errors[:5], 1):
+            line = err.get('line', '?')
+            col = err.get('column', '?')
+            token = err.get('token', '?')
+            
+            msg += f"""
+            <tr>
+                <td style="padding: 4px;"><b>{i}.</b></td>
+                <td style="padding: 4px;">Línea {line}, Col {col}</td>
+                <td style="padding: 4px; color: #d32f2f;">{token}</td>
+            </tr>
+            """
+        
+        if num_errors > 5:
+            msg += f"""
+            <tr>
+                <td colspan="3" style="padding: 4px;">
+                    <i>... y {num_errors - 5} error(es) más</i>
+                </td>
+            </tr>
+            """
+        
+        msg += """
+        </table>
+        <br>
+        <p><i>Consulta la terminal para ver los detalles completos.</i></p>
+        """
+        
+        msg_box = QtWidgets.QMessageBox(self)
+        msg_box.setIcon(QtWidgets.QMessageBox.Icon.Warning)
+        msg_box.setWindowTitle("Errores Sintácticos")
+        msg_box.setTextFormat(QtCore.Qt.TextFormat.RichText)
+        msg_box.setText(msg)
+        msg_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
+        msg_box.exec()

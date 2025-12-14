@@ -44,7 +44,8 @@ snaptics/
 │   ├── file_manager.py       # Manejador de archivos
 │   ├── theme_manager.py      # Manejador de temas
 │   └── compilerGUI.ui        # Archivo de diseño original
-└── lexer.py                  # Analizador léxico
+├── lexer.py                  # Analizador léxico
+└── parser.py                 # Analizador sintáctico
 ```
 
 En la aplicación, abre o escribe código y presiona F9 (o menú Run → Compile) para ejecutar el analizador léxico y ver los tokens en la terminal integrada.
