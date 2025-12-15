@@ -7,10 +7,6 @@ Analizador Sintáctico para snaptics
 Análisis de datos probabilístico con razonamiento lógico
 """
 
-# ==================== CONFIGURACIÓN DE RECUPERACIÓN ====================
-MAX_ERRORS = 15
-SYNC_TOKENS = {'FACT', 'RULE', 'QUERY', 'DATASET', 'IMPORT'}
-
 # ==================== PRECEDENCIA Y ASOCIATIVIDAD ====================
 precedence = (
     ('left', 'OR'),
@@ -322,163 +318,31 @@ def p_empty(p):
     '''empty :'''
     pass
 
-# ==================== REGLAS DE ERROR ====================
+# ==================== MANEJO DE ERRORES ====================
 
-# Error: fact id = P <sin paréntesis>
-def p_declaracion_hecho_error_sin_lparen(p):
-    '''declaracion_hecho : FACT ID ASIG PROB ID
-                        | FACT ID ASIG PROB ID operador_relacional
-                        | FACT ID ASIG PROB ID operador_relacional termino_aritmetico'''
-    error = {
-        'type': 'syntax_error',
-        'line': p.lineno(4),
-        'column': 0,
-        'token': 'MISSING_LPAREN',
-        'value': None,
-        'message': "Falta paréntesis de apertura '(' después de P",
-        'suggestion': f"Use: fact {p[2]} = P(<expresión>)"
-    }
-    parser.errors.append(error)
-    # Intentar recuperar
-    parser.errok()
-    p[0] = ASTNode('DeclaracionHecho', fact_id=p[2], probabilidad=None, line=p.lineno(1))
-
-# Error: fact id = P( <expresión sin cerrar>
-def p_declaracion_hecho_error_sin_rparen(p):
-    '''declaracion_hecho : FACT ID ASIG PROB LPAREN expresion'''
-    error = {
-        'type': 'syntax_error',
-        'line': p.lineno(1),
-        'column': 0,
-        'token': 'MISSING_RPAREN',
-        'value': None,
-        'message': "Falta paréntesis de cierre ')' en la declaración de probabilidad",
-        'suggestion': f"Use: fact {p[2]} = P({p[6]})"
-    }
-    parser.errors.append(error)
-    parser.errok()
-    p[0] = ASTNode('DeclaracionHecho', fact_id=p[2], probabilidad=p[6], line=p.lineno(1))
-
-# Error: dataset id = import <sin from>
-def p_importacion_error_sin_from(p):
-    '''importacion : DATASET ID ASIG IMPORT STRING'''
-    error = {
-        'type': 'syntax_error',
-        'line': p.lineno(4),
-        'column': 0,
-        'token': 'MISSING_FROM',
-        'value': None,
-        'message': "Falta la palabra clave 'from' en la importación",
-        'suggestion': f"Use: dataset {p[2]} = import from {p[5]}"
-    }
-    parser.errors.append(error)
-    parser.errok()
-    p[0] = ASTNode('Importacion', dataset_id=p[2], source_file=p[5], line=p.lineno(1))
-
-# Error: dataset id = import from <sin string>
-def p_importacion_error_sin_string(p):
-    '''importacion : DATASET ID ASIG IMPORT FROM'''
-    error = {
-        'type': 'syntax_error',
-        'line': p.lineno(1),
-        'column': 0,
-        'token': 'MISSING_STRING',
-        'value': None,
-        'message': "Se esperaba una cadena de texto con el nombre del archivo",
-        'suggestion': f'Use: dataset {p[2]} = import from "archivo.csv"'
-    }
-    parser.errors.append(error)
-    parser.errok()
-    p[0] = ASTNode('Importacion', dataset_id=p[2], source_file=None, line=p.lineno(1))
-
-# Error: rule id <sin :->
-def p_declaracion_regla_error_sin_cond(p):
-    '''declaracion_regla : RULE ID expresion'''
-    error = {
-        'type': 'syntax_error',
-        'line': p.lineno(2),
-        'column': 0,
-        'token': 'MISSING_COND',
-        'value': None,
-        'message': "Falta el operador ':-' en la declaración de regla",
-        'suggestion': f"Use: rule {p[2]} :- <condición>"
-    }
-    parser.errors.append(error)
-    parser.errok()
-    p[0] = ASTNode('DeclaracionRegla', rule_id=p[2], condicion=p[3], line=p.lineno(1))
-
-# ==================== MANEJO DE ERRORES GENERAL ====================
-
-def generate_contextual_message(p):
-    """Genera mensajes específicos según el token problemático"""
-    token_type = p.type
-    token_value = p.value
-    
-    if token_type == 'RPAREN':
-        return {
-            'message': "Paréntesis de cierre ')' inesperado",
-            'suggestion': "Verifica que haya un paréntesis de apertura correspondiente"
+def p_error(p):
+    """Maneja errores sintácticos"""
+    if p:
+        error = {
+            'type': 'syntax_error',
+            'line': p.lineno,
+            'column': find_column(p),
+            'token': p.type,
+            'value': p.value,
+            'message': f"Error de sintaxis: token inesperado '{p.value}' (tipo: {p.type})"
         }
-    elif token_type == 'LPAREN':
-        return {
-            'message': "Paréntesis de apertura '(' inesperado",
-            'suggestion': "Verifica la sintaxis antes del paréntesis"
-        }
-    elif token_type == 'COMMA':
-        return {
-            'message': "Coma ',' inesperada",
-            'suggestion': "Las comas se usan para separar elementos en listas"
-        }
-    elif token_type in ['ADD', 'SUB', 'MUL', 'DIV', 'POW']:
-        op_map = {'ADD': '+', 'SUB': '-', 'MUL': '*', 'DIV': '/', 'POW': '^'}
-        return {
-            'message': f"Operador '{op_map[token_type]}' inesperado",
-            'suggestion': "Verifica que haya operandos válidos antes y después"
-        }
-    elif token_type == 'ASIG':
-        return {
-            'message': "Asignación '=' inesperada",
-            'suggestion': "La asignación solo es válida en declaraciones"
-        }
-    elif token_type in ['EQ', 'NEQ', 'LEQ', 'GEQ', 'LESSTHAN', 'GREATERTHAN']:
-        return {
-            'message': f"Operador de comparación '{token_value}' inesperado",
-            'suggestion': "Verifica las expresiones alrededor del operador"
-        }
-    elif token_type == 'ID':
-        return {
-            'message': f"Identificador '{token_value}' en posición incorrecta",
-            'suggestion': "Verifica la sintaxis de la declaración"
-        }
-    elif token_type in ['AND', 'OR', 'NOT']:
-        return {
-            'message': f"Operador lógico '{token_value}' inesperado",
-            'suggestion': "Verifica las expresiones booleanas alrededor"
-        }
+        parser.errors.append(error)
+        parser.errok()
     else:
-        return {
-            'message': f"Token inesperado '{token_value}' (tipo: {token_type})",
-            'suggestion': "Verifica la sintaxis general"
+        error = {
+            'type': 'syntax_error',
+            'line': 'EOF',
+            'column': 0,
+            'token': 'EOF',
+            'value': None,
+            'message': "Error de sintaxis: final inesperado del archivo"
         }
-
-def panic_mode_recovery(error_token):
-    """Descarta tokens hasta encontrar un punto de sincronización"""
-    count = 0
-    discarded_tokens = []
-    
-    while True:
-        tok = parser.token()
-        if not tok:
-            return None, discarded_tokens
-        
-        count += 1
-        discarded_tokens.append((tok.type, tok.value))
-        
-        if tok.type in SYNC_TOKENS:
-            return tok, discarded_tokens
-        
-        if count > 50:
-            return None, discarded_tokens
+        parser.errors.append(error)
 
 def find_column(token):
     """Encuentra la columna de un token"""
@@ -487,59 +351,6 @@ def find_column(token):
     input_text = token.lexer.lexdata
     line_start = input_text.rfind('\n', 0, token.lexpos) + 1
     return (token.lexpos - line_start) + 1
-
-def p_error(p):
-    """Maneja errores sintácticos con recuperación"""
-    
-    if len(parser.errors) >= MAX_ERRORS:
-        if p:
-            error = {
-                'type': 'fatal_error',
-                'line': p.lineno,
-                'column': 0,
-                'token': 'MAX_ERRORS',
-                'value': None,
-                'message': f"Se alcanzó el límite de {MAX_ERRORS} errores",
-                'suggestion': "Corrija los errores anteriores"
-            }
-            parser.errors.append(error)
-        return
-    
-    if p:
-        context = generate_contextual_message(p)
-        
-        error = {
-            'type': 'syntax_error',
-            'line': p.lineno,
-            'column': find_column(p),
-            'token': p.type,
-            'value': p.value,
-            'message': context['message'],
-            'suggestion': context['suggestion']
-        }
-        parser.errors.append(error)
-        
-        sync_token, discarded = panic_mode_recovery(p)
-        
-        if sync_token:
-            parser.recovery_info.append({
-                'error_line': p.lineno,
-                'recovered_at': sync_token.lineno,
-                'discarded_count': len(discarded),
-                'sync_token': sync_token.type
-            })
-            parser.errok()
-    else:
-        error = {
-            'type': 'syntax_error',
-            'line': 'EOF',
-            'column': 0,
-            'token': 'EOF',
-            'value': None,
-            'message': "Final inesperado del archivo",
-            'suggestion': "Puede faltar completar una declaración"
-        }
-        parser.errors.append(error)
 
 # ==================== CONSTRUCCIÓN DEL PARSER ====================
 
@@ -550,15 +361,23 @@ def make_parser():
     global parser
     parser = yacc.yacc()
     parser.errors = []
-    parser.recovery_info = []
     return parser
 
+# ==================== FUNCIÓN DE PARSING ====================
+
 def parse(text: str, debug=False) -> Dict[str, Any]:
-    """Parsea el texto y devuelve el AST y errores"""
+    """
+    Parsea el texto y devuelve el AST y errores.
+    
+    Returns:
+        Dict con:
+        - 'ast': Árbol de sintaxis abstracta
+        - 'errors': Lista de errores sintácticos
+        - 'success': Boolean indicando éxito
+    """
     lexer_instance = make_lexer()
     parser_instance = make_parser()
     parser_instance.errors = []
-    parser_instance.recovery_info = []
     
     try:
         ast = parser_instance.parse(text, lexer=lexer_instance, debug=debug)
@@ -566,24 +385,19 @@ def parse(text: str, debug=False) -> Dict[str, Any]:
         return {
             'ast': ast,
             'errors': parser_instance.errors,
-            'success': len(parser_instance.errors) == 0,
-            'recovery_info': parser_instance.recovery_info
+            'success': len(parser_instance.errors) == 0
         }
     except Exception as e:
         return {
             'ast': None,
             'errors': parser_instance.errors + [{
                 'type': 'critical_error',
-                'line': 0,
-                'column': 0,
-                'token': 'EXCEPTION',
-                'value': None,
-                'message': f"Error crítico: {str(e)}",
-                'suggestion': "Contacte al desarrollador"
+                'message': f"Error crítico: {str(e)}"
             }],
-            'success': False,
-            'recovery_info': parser_instance.recovery_info
+            'success': False
         }
+
+# ==================== UTILIDADES ====================
 
 def print_ast(node, indent=0):
     """Imprime el AST de forma legible"""
@@ -608,7 +422,7 @@ def print_ast(node, indent=0):
         print(f"{prefix}{node}")
 
 def format_syntax_errors(errors: List[Dict]) -> str:
-    """Formatea errores sintácticos para consola"""
+    """Formatea errores sintácticos para mostrar en consola"""
     if not errors:
         return ""
     
@@ -624,12 +438,7 @@ def format_syntax_errors(errors: List[Dict]) -> str:
             lines.append(f"  Posición: Final del archivo")
         else:
             lines.append(f"  Línea {error.get('line', '?')}, Columna {error.get('column', '?')}")
-        
         lines.append(f"  Problema: {error.get('message', 'Error desconocido')}")
-        
-        if error.get('suggestion'):
-            lines.append(f"  💡 Sugerencia: {error['suggestion']}")
-        
         lines.append("")
         lines.append("-" * 70)
         lines.append("")
