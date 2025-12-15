@@ -4,6 +4,7 @@ import contextlib
 import io
 import sys
 import re
+import difflib
 
 """
     Como construír nuestro léxico:
@@ -130,7 +131,22 @@ t_DOT = r'\.'
 
 def t_ID(t):
     r'[A-Za-z_][A-Za-z_0-9.]*'
-    t.type = reserved.get(t.value,'ID')    # Check for reserved words
+    if t.value in reserved:
+        t.type = reserved[t.value]
+    else:
+        reserved_words = list(reserved.keys())
+        # Ajustar cutoff basado en longitud de la palabra
+        cutoff = 0.85 if len(t.value) > 3 else 0.75
+        suggestions = difflib.get_close_matches(t.value.lower(), reserved_words, n=1, cutoff=cutoff)
+        if suggestions:
+            error = {
+                'type': 'lexical',
+                'line': t.lineno,
+                'column': find_column(t.lexer.lexdata, t),
+                'line_text': t.lexer.lexdata.splitlines()[t.lineno - 1] if t.lineno - 1 < len(t.lexer.lexdata.splitlines()) else "",
+                'message': f"Posible error de escritura en palabra reservada: '{t.value}'. ¿Quizás quisiste decir '{suggestions[0]}'?"
+            }
+            t.lexer.errors.append(error)
     return t
 
 def t_REAL(t):
@@ -283,7 +299,15 @@ def t_error(t):
     if not message:
         message = categorize_char_error(char, line_text, column)
     
+    # Sugerir palabra reservada similar
+    reserved_words = list(reserved.keys())
+    suggestions = difflib.get_close_matches(t.value.lower(), reserved_words, n=1, cutoff=0.8)
+    if suggestions:
+        suggestion = suggestions[0]
+        message += f" ¿Quizás quisiste decir '{suggestion}'?"
+    
     error = {
+        'type': 'lexical',
         'line': line,
         'column': column,
         'line_text': line_text,

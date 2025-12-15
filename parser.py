@@ -5,6 +5,9 @@ from typing import Dict, Any, List
 """
 Analizador Sintáctico para snaptics
 Análisis de datos probabilístico con razonamiento lógico
+
+TODO
+-
 """
 
 # ==================== PRECEDENCIA Y ASOCIATIVIDAD ====================
@@ -46,14 +49,17 @@ class ASTNode:
 
 # ==================== REGLAS DE LA GRAMÁTICA ====================
 
-def p_programa_sentencia(p):
-    '''programa : sentencia'''
-    p[0] = ASTNode('Programa', sentencias=[p[1]], line=p.lineno(1))
-
-def p_programa_multiple(p):
-    '''programa : programa sentencia'''
-    p[1].properties['sentencias'].append(p[2])
-    p[0] = p[1]
+def p_programa(p):
+    '''programa : sentencia
+                | programa sentencia'''
+    if len(p) == 2:
+        p[0] = ASTNode('Programa', sentencias=[p[1]], line=p.lineno(1) if p[1] else 0)
+    else:
+        if p[1]:
+            p[1].properties['sentencias'].append(p[2])
+            p[0] = p[1]
+        else: # pragma: no cover
+            p[0] = ASTNode('Programa', sentencias=[p[2]], line=p.lineno(1) if p[2] else 0)
 
 def p_sentencia(p):
     '''sentencia : importacion
@@ -81,13 +87,13 @@ def p_preprocesamiento_completo(p):
                    descubrimiento=p[10],
                    line=p.lineno(1))
 
-def p_lista_ids_single(p):
-    '''lista_ids : ID'''
-    p[0] = [p[1]]
-
-def p_lista_ids_multiple(p):
-    '''lista_ids : ID COMMA lista_ids'''
-    p[0] = [p[1]] + p[3]
+def p_lista_ids(p):
+    '''lista_ids : ID
+                 | ID COMMA lista_ids'''
+    if len(p) == 2:  # Regla: lista_ids : ID
+        p[0] = [p[1]]
+    else:  # Regla: lista_ids : ID COMMA lista_ids
+        p[0] = [p[1]] + p[3]
 
 def p_condicion_opt(p):
     '''condicion_opt : WHERE expresion
@@ -112,16 +118,16 @@ def p_lista_hechos(p):
                    threshold=p[8],
                    line=p.lineno(1))
 
-def p_declaracion_hecho_probabilidad(p):
-    '''declaracion_hecho : FACT ID ASIG PROB LPAREN expresion RPAREN'''
-    p[0] = ASTNode('DeclaracionHecho',
-                   fact_id=p[2],
-                   probabilidad=p[6],
-                   line=p.lineno(1))
-
-def p_declaracion_hecho_metrica(p):
-    '''declaracion_hecho : declaracion_metrica'''
-    p[0] = p[1]
+def p_declaracion_hecho(p):
+    '''declaracion_hecho : FACT ID ASIG PROB LPAREN expresion RPAREN
+                         | declaracion_metrica'''
+    if len(p) > 2:
+        p[0] = ASTNode('DeclaracionHecho',
+                       fact_id=p[2],
+                       probabilidad=p[6],
+                       line=p.lineno(1))
+    else:
+        p[0] = p[1]
 
 def p_declaracion_metrica(p):
     '''declaracion_metrica : ID ASIG metrica_estatica'''
@@ -130,24 +136,22 @@ def p_declaracion_metrica(p):
                    metrica=p[3],
                    line=p.lineno(1))
 
-def p_metrica_estatica_mean(p):
-    '''metrica_estatica : MEAN LPAREN ID DOT ID RPAREN'''
-    p[0] = ASTNode('Mean', dataset=p[3], columna=p[5], line=p.lineno(1))
-
-def p_metrica_estatica_var(p):
-    '''metrica_estatica : VAR LPAREN ID DOT ID RPAREN'''
-    p[0] = ASTNode('Variance', dataset=p[3], columna=p[5], line=p.lineno(1))
-
-def p_metrica_estatica_std(p):
-    '''metrica_estatica : STD LPAREN ID DOT ID RPAREN'''
-    p[0] = ASTNode('StdDev', dataset=p[3], columna=p[5], line=p.lineno(1))
-
-def p_metrica_estatica_correlation(p):
-    '''metrica_estatica : CORRELATION LPAREN ID DOT ID COMMA ID DOT ID RPAREN'''
-    p[0] = ASTNode('Correlation',
-                   dataset1=p[3], columna1=p[5],
-                   dataset2=p[7], columna2=p[9],
-                   line=p.lineno(1))
+def p_metrica_estatica(p):
+    '''metrica_estatica : MEAN LPAREN ID DOT ID RPAREN
+                        | VAR LPAREN ID DOT ID RPAREN
+                        | STD LPAREN ID DOT ID RPAREN
+                        | CORRELATION LPAREN ID DOT ID COMMA ID DOT ID RPAREN'''
+    if p[1] == 'mean':
+        p[0] = ASTNode('Mean', dataset=p[3], columna=p[5], line=p.lineno(1))
+    elif p[1] == 'var':
+        p[0] = ASTNode('Variance', dataset=p[3], columna=p[5], line=p.lineno(1))
+    elif p[1] == 'std':
+        p[0] = ASTNode('StdDev', dataset=p[3], columna=p[5], line=p.lineno(1))
+    elif p[1] == 'correlation':
+        p[0] = ASTNode('Correlation',
+                       dataset1=p[3], columna1=p[5],
+                       dataset2=p[7], columna2=p[9],
+                       line=p.lineno(1))
 
 def p_declaracion_regla(p):
     '''declaracion_regla : RULE ID COND expresion'''
@@ -168,50 +172,45 @@ def p_explicacion_opt(p):
                       | empty'''
     p[0] = p[1] if len(p) == 2 and p[1] else None
 
-def p_expresion_or(p):
-    '''expresion : expresion OR termino_comparacion'''
-    p[0] = ASTNode('OperacionLogica', operador='OR', izq=p[1], der=p[3], line=p.lineno(2))
+def p_expresion(p):
+    '''expresion : expresion OR termino_comparacion
+                 | termino_comparacion'''
+    if len(p) == 4:
+        p[0] = ASTNode('OperacionLogica', operador='OR', izq=p[1], der=p[3], line=p.lineno(2))
+    else:
+        p[0] = p[1]
 
-def p_expresion_termino(p):
-    '''expresion : termino_comparacion'''
-    p[0] = p[1]
+def p_termino_comparacion(p):
+    '''termino_comparacion : termino_comparacion AND termino_logico
+                           | termino_logico'''
+    if len(p) == 4:
+        p[0] = ASTNode('OperacionLogica', operador='AND', izq=p[1], der=p[3], line=p.lineno(2))
+    else:
+        p[0] = p[1]
 
-def p_termino_comparacion_and(p):
-    '''termino_comparacion : termino_comparacion AND termino_logico'''
-    p[0] = ASTNode('OperacionLogica', operador='AND', izq=p[1], der=p[3], line=p.lineno(2))
+def p_termino_logico(p):
+    '''termino_logico : NOT factor_logico
+                      | factor_logico'''
+    if len(p) == 3:
+        p[0] = ASTNode('OperacionLogica', operador='NOT', operando=p[2], line=p.lineno(1))
+    else:
+        p[0] = p[1]
 
-def p_termino_comparacion_logico(p):
-    '''termino_comparacion : termino_logico'''
-    p[0] = p[1]
-
-def p_termino_logico_not(p):
-    '''termino_logico : NOT factor_logico'''
-    p[0] = ASTNode('OperacionLogica', operador='NOT', operando=p[2], line=p.lineno(1))
-
-def p_termino_logico_factor(p):
-    '''termino_logico : factor_logico'''
-    p[0] = p[1]
-
-def p_factor_logico_parentesis(p):
-    '''factor_logico : LPAREN expresion RPAREN'''
-    p[0] = p[2]
-
-def p_factor_logico_relacional(p):
-    '''factor_logico : termino_relacional'''
-    p[0] = p[1]
-
-def p_factor_logico_probabilidad(p):
-    '''factor_logico : probabilidad_condicional'''
-    p[0] = p[1]
-
-def p_factor_logico_id(p):
-    '''factor_logico : ID'''
-    p[0] = ASTNode('Identificador', nombre=p[1], line=p.lineno(1))
-
-def p_factor_logico_booleano(p):
-    '''factor_logico : TRUE
-                    | FALSE'''
-    p[0] = ASTNode('Literal', tipo='bool', valor=(p[1] == 'true'), line=p.lineno(1))
+def p_factor_logico(p):
+    '''factor_logico : LPAREN expresion RPAREN
+                     | termino_relacional
+                     | probabilidad_condicional
+                     | ID
+                     | TRUE
+                     | FALSE'''
+    if p.slice[1].type == 'LPAREN':
+        p[0] = p[2]
+    elif p.slice[1].type == 'ID':
+        p[0] = ASTNode('Identificador', nombre=p[1], line=p.lineno(1))
+    elif p.slice[1].type in ('TRUE', 'FALSE'):
+        p[0] = ASTNode('Literal', tipo='bool', valor=(p[1] == 'true'), line=p.lineno(1))
+    else:
+        p[0] = p[1]
 
 def p_termino_relacional(p):
     '''termino_relacional : termino_aritmetico operador_relacional termino_aritmetico'''
@@ -222,11 +221,11 @@ def p_termino_relacional(p):
                    line=p[1].line if isinstance(p[1], ASTNode) else 0)
 
 def p_probabilidad_condicional_simple(p):
-    '''probabilidad_condicional : PROB LPAREN termino_relacional RPAREN'''
+    '''probabilidad_condicional : PROB LPAREN expresion RPAREN'''
     p[0] = ASTNode('Probabilidad', condicion=p[3], dado=None, line=p.lineno(1))
 
 def p_probabilidad_condicional_given(p):
-    '''probabilidad_condicional : PROB LPAREN termino_relacional GIVEN termino_relacional RPAREN'''
+    '''probabilidad_condicional : PROB LPAREN expresion GIVEN expresion RPAREN'''
     p[0] = ASTNode('Probabilidad', condicion=p[3], dado=p[5], line=p.lineno(1))
 
 def p_operador_relacional(p):
@@ -238,81 +237,67 @@ def p_operador_relacional(p):
                           | GREATERTHAN'''
     p[0] = p[1]
 
-def p_termino_aritmetico_add(p):
-    '''termino_aritmetico : termino_aritmetico ADD factor_aritmetico'''
-    p[0] = ASTNode('OperacionAritmetica', operador='+', izq=p[1], der=p[3], line=p.lineno(2))
+def p_termino_aritmetico(p):
+    '''termino_aritmetico : termino_aritmetico ADD factor_aritmetico
+                          | termino_aritmetico SUB factor_aritmetico
+                          | factor_aritmetico'''
+    if len(p) == 4:
+        op = '+' if p[2] == '+' else '-'
+        p[0] = ASTNode('OperacionAritmetica', operador=op, izq=p[1], der=p[3], line=p.lineno(2))
+    else:
+        p[0] = p[1]
 
-def p_termino_aritmetico_sub(p):
-    '''termino_aritmetico : termino_aritmetico SUB factor_aritmetico'''
-    p[0] = ASTNode('OperacionAritmetica', operador='-', izq=p[1], der=p[3], line=p.lineno(2))
+def p_factor_aritmetico(p):
+    '''factor_aritmetico : factor_aritmetico MUL unario_aritmetico
+                         | factor_aritmetico DIV unario_aritmetico
+                         | unario_aritmetico'''
+    if len(p) == 4:
+        op = '*' if p[2] == '*' else '/'
+        p[0] = ASTNode('OperacionAritmetica', operador=op, izq=p[1], der=p[3], line=p.lineno(2))
+    else:
+        p[0] = p[1]
 
-def p_termino_aritmetico_factor(p):
-    '''termino_aritmetico : factor_aritmetico'''
-    p[0] = p[1]
+def p_unario_aritmetico(p):
+    '''unario_aritmetico : SUB potencia %prec UMINUS
+                         | ADD potencia %prec UPLUS
+                         | potencia'''
+    if len(p) == 3:
+        op = '-' if p[1] == '-' else '+'
+        p[0] = ASTNode('OperacionUnaria', operador=op, operando=p[2], line=p.lineno(1))
+    else:
+        p[0] = p[1]
 
-def p_factor_aritmetico_mul(p):
-    '''factor_aritmetico : factor_aritmetico MUL unario_aritmetico'''
-    p[0] = ASTNode('OperacionAritmetica', operador='*', izq=p[1], der=p[3], line=p.lineno(2))
+def p_potencia(p):
+    '''potencia : valor_base POW unario_aritmetico
+                | valor_base'''
+    if len(p) == 4:
+        p[0] = ASTNode('OperacionAritmetica', operador='^', izq=p[1], der=p[3], line=p.lineno(2))
+    else:
+        p[0] = p[1]
 
-def p_factor_aritmetico_div(p):
-    '''factor_aritmetico : factor_aritmetico DIV unario_aritmetico'''
-    p[0] = ASTNode('OperacionAritmetica', operador='/', izq=p[1], der=p[3], line=p.lineno(2))
-
-def p_factor_aritmetico_unario(p):
-    '''factor_aritmetico : unario_aritmetico'''
-    p[0] = p[1]
-
-def p_unario_aritmetico_minus(p):
-    '''unario_aritmetico : SUB potencia %prec UMINUS'''
-    p[0] = ASTNode('OperacionUnaria', operador='-', operando=p[2], line=p.lineno(1))
-
-def p_unario_aritmetico_plus(p):
-    '''unario_aritmetico : ADD potencia %prec UPLUS'''
-    p[0] = ASTNode('OperacionUnaria', operador='+', operando=p[2], line=p.lineno(1))
-
-def p_unario_aritmetico_potencia(p):
-    '''unario_aritmetico : potencia'''
-    p[0] = p[1]
-
-def p_potencia_pow(p):
-    '''potencia : valor_base POW unario_aritmetico'''
-    p[0] = ASTNode('OperacionAritmetica', operador='^', izq=p[1], der=p[3], line=p.lineno(2))
-
-def p_potencia_valor(p):
-    '''potencia : valor_base'''
-    p[0] = p[1]
-
-def p_valor_base_int(p):
-    '''valor_base : INT'''
-    p[0] = ASTNode('Literal', tipo='int', valor=p[1], line=p.lineno(1))
-
-def p_valor_base_real(p):
-    '''valor_base : REAL'''
-    p[0] = ASTNode('Literal', tipo='real', valor=p[1], line=p.lineno(1))
-
-def p_valor_base_string(p):
-    '''valor_base : STRING'''
-    p[0] = ASTNode('Literal', tipo='string', valor=p[1], line=p.lineno(1))
-
-def p_valor_base_true(p):
-    '''valor_base : TRUE'''
-    p[0] = ASTNode('Literal', tipo='bool', valor=True, line=p.lineno(1))
-
-def p_valor_base_false(p):
-    '''valor_base : FALSE'''
-    p[0] = ASTNode('Literal', tipo='bool', valor=False, line=p.lineno(1))
-
-def p_valor_base_id(p):
-    '''valor_base : ID'''
-    p[0] = ASTNode('Identificador', nombre=p[1], line=p.lineno(1))
-
-def p_valor_base_id_dot(p):
-    '''valor_base : ID DOT ID'''
-    p[0] = ASTNode('AccesoMiembro', objeto=p[1], miembro=p[3], line=p.lineno(1))
-
-def p_valor_base_parentesis(p):
-    '''valor_base : LPAREN expresion RPAREN'''
-    p[0] = p[2]
+def p_valor_base(p):
+    '''valor_base : INT
+                  | REAL
+                  | STRING
+                  | TRUE
+                  | FALSE
+                  | ID
+                  | ID DOT ID
+                  | LPAREN expresion RPAREN
+                  | probabilidad_condicional'''
+    if p.slice[1].type in ('INT', 'REAL', 'STRING'):
+        tipo = {'INT': 'int', 'REAL': 'real', 'STRING': 'string'}[p.slice[1].type]
+        p[0] = ASTNode('Literal', tipo=tipo, valor=p[1], line=p.lineno(1))
+    elif p.slice[1].type in ('TRUE', 'FALSE'):
+        p[0] = ASTNode('Literal', tipo='bool', valor=(p[1] == 'true'), line=p.lineno(1))
+    elif p.slice[1].type == 'ID' and len(p) == 2:
+        p[0] = ASTNode('Identificador', nombre=p[1], line=p.lineno(1))
+    elif p.slice[1].type == 'ID' and len(p) == 4:
+        p[0] = ASTNode('AccesoMiembro', objeto=p[1], miembro=p[3], line=p.lineno(1))
+    elif p.slice[1].type == 'LPAREN':
+        p[0] = p[2]
+    elif p.slice[1].type == 'PROB':
+        p[0] = p[1]
 
 def p_empty(p):
     '''empty :'''
@@ -376,6 +361,7 @@ def parse(text: str, debug=False) -> Dict[str, Any]:
         - 'success': Boolean indicando éxito
     """
     lexer_instance = make_lexer()
+    lexer_instance.errors = []
     parser_instance = make_parser()
     parser_instance.errors = []
     
@@ -390,7 +376,7 @@ def parse(text: str, debug=False) -> Dict[str, Any]:
     except Exception as e:
         return {
             'ast': None,
-            'errors': parser_instance.errors + [{
+            'errors': parser_instance.errors + lexer_instance.errors + [{
                 'type': 'critical_error',
                 'message': f"Error crítico: {str(e)}"
             }],

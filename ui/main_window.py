@@ -274,39 +274,8 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
                 self.last_tokens = []
 
             # Verificar errores léxicos
-            if lex_result['errors']:
-                lines.append("")
-                lines.append("✗ ERRORES LÉXICOS ENCONTRADOS")
-                lines.append("")
-                
-                # Imprimir lo que tenemos hasta ahora
-                self._print_to_terminal("\n".join(lines))
-                
-                # Agregar errores formateados
-                error_output = lexer.format_errors(lex_result['errors'])
-                self._print_to_terminal_append(error_output)
-                
-                lines_footer = []
-                lines_footer.append("")
-                lines_footer.append("⚠️  La compilación se detuvo en la fase léxica.")
-                lines_footer.append("   Corrija los errores antes de continuar.")
-                lines_footer.append("")
-                lines_footer.append("=" * 70)
-                self._print_to_terminal_append("\n".join(lines_footer))
-                
-                # Limpiar panel de tokens
-                if hasattr(self, 'tokens_panel'):
-                    self.tokens_panel.clear()
-                    self.tokens_dock.hide()
-                
-                # Mostrar diálogo de error
-                QtWidgets.QMessageBox.critical(
-                    self,
-                    "Error Léxico",
-                    f"Se encontraron {len(lex_result['errors'])} error(es) léxico(s).\n\n"
-                    f"Consulta la terminal para más detalles."
-                )
-                return
+            lexical_errors = lex_result['errors']
+            has_lexical_errors = len(lexical_errors) > 0
             
             # Mostrar resumen de tokens
             num_tokens = len(lex_result['tokens'])
@@ -350,7 +319,10 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
             
             parse_result = syntax_parser.parse(text)
             
-            if parse_result['success']:
+            syntactic_errors = parse_result['errors']
+            has_syntactic_errors = len(syntactic_errors) > 0
+            
+            if parse_result['success'] and not has_lexical_errors:
                 # Análisis sintáctico exitoso
                 lines.append("")
                 lines.append(f"Análisis sintáctico completado")
@@ -387,8 +359,8 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
                 lines_final.append("=" * 70)
                 lines_final.append("")
                 lines_final.append("Resumen:")
-                lines_final.append(f"  • Fase léxica:      {num_tokens} tokens")
-                lines_final.append(f"  • Fase sintáctica:  AST generado")
+                lines_final.append(f"  • Fase léxica:      ✓ {num_tokens} tokens")
+                lines_final.append(f"  • Fase sintáctica:  ✓ AST generado")
                 lines_final.append(f"  • Líneas analizadas: {num_lines}")
                 lines_final.append("")
                 lines_final.append("=" * 70)
@@ -405,38 +377,53 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
                     f"Consulta la terminal para ver los detalles completos."
                 )
             else:
-                # Hay errores sintácticos
-                num_errors = len(parse_result['errors'])
+                # Hay errores (léxicos o sintácticos)
+                all_errors = []
                 
-                lines.append("")
-                lines.append("✗ ERRORES SINTÁCTICOS ENCONTRADOS")
-                lines.append("")
+                if has_lexical_errors:
+                    lines.append("")
+                    lines.append("✗ ERRORES LÉXICOS ENCONTRADOS")
+                    lines.append("")
+                    # Agregar errores léxicos formateados
+                    lexical_error_output = lexer.format_errors(lexical_errors)
+                    lines.append(lexical_error_output)
+                    all_errors.extend(lexical_errors)
                 
-                # Imprimir lo que tenemos hasta ahora
+                if has_syntactic_errors and not has_lexical_errors:
+                    lines.append("")
+                    lines.append("✗ ERRORES SINTÁCTICOS ENCONTRADOS")
+                    lines.append("")
+                    
+                    # Formatear errores sintácticos
+                    for i, error in enumerate(syntactic_errors, 1):
+                        lines.append(f"[Error #{len(all_errors) + i}]")
+                        if error.get('line') == 'EOF':
+                            lines.append(f"  Posición: Final del archivo")
+                        else:
+                            lines.append(f"  Línea {error.get('line', '?')}, Columna {error.get('column', '?')}")
+                        
+                        token_type = error.get('token', '?')
+                        token_value = error.get('value', '')
+                        if token_value:
+                            lines.append(f"  Token problemático: '{token_value}' (tipo: {token_type})")
+                        else:
+                            lines.append(f"  Token problemático: {token_type}")
+                        
+                        lines.append(f"  Mensaje: {error.get('message', 'Error desconocido')}")
+                        lines.append("")
+                        lines.append("-" * 70)
+                        lines.append("")
+                    
+                    all_errors.extend(syntactic_errors)
+                elif has_syntactic_errors and has_lexical_errors:
+                    lines.append("")
+                    lines.append("⚠️  NOTA: Hay errores sintácticos adicionales, pero pueden ser")
+                    lines.append("   consecuencia de los errores léxicos. Corrija primero los")
+                    lines.append("   errores léxicos y vuelva a compilar.")
+                    lines.append("")
+                
+                # Imprimir todo hasta ahora
                 self._print_to_terminal("\n".join(lines))
-                
-                # Formatear errores de forma similar al lexer
-                error_lines = []
-                for i, error in enumerate(parse_result['errors'], 1):
-                    error_lines.append(f"[Error #{i}]")
-                    if error.get('line') == 'EOF':
-                        error_lines.append(f"  Posición: Final del archivo")
-                    else:
-                        error_lines.append(f"  Línea {error.get('line', '?')}, Columna {error.get('column', '?')}")
-                    
-                    token_type = error.get('token', '?')
-                    token_value = error.get('value', '')
-                    if token_value:
-                        error_lines.append(f"  Token problemático: '{token_value}' (tipo: {token_type})")
-                    else:
-                        error_lines.append(f"  Token problemático: {token_type}")
-                    
-                    error_lines.append(f"  Mensaje: {error.get('message', 'Error desconocido')}")
-                    error_lines.append("")
-                    error_lines.append("-" * 70)
-                    error_lines.append("")
-                
-                self._print_to_terminal_append("\n".join(error_lines))
                 
                 # ========== RESUMEN FINAL CON ERRORES ==========
                 lines_final = []
@@ -446,8 +433,26 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
                 lines_final.append("=" * 70)
                 lines_final.append("")
                 lines_final.append("Resumen:")
-                lines_final.append(f"  • Fase léxica:      ✓ {num_tokens} tokens")
-                lines_final.append(f"  • Fase sintáctica:  ✗ {num_errors} error(es)")
+                lines_final.append(f"  • Fase léxica:      {'✗' if has_lexical_errors else '✓'} {num_tokens} tokens")
+                if has_lexical_errors:
+                    lines_final.append(f"  • Fase sintáctica:  ⚠️  Omitida (errores léxicos detectados)")
+                else:
+                    lines_final.append(f"  • Fase sintáctica:  {'✗' if has_syntactic_errors else '✓'} {len(syntactic_errors)} error(es)")
+                lines_final.append(f"  • Total errores:    {len(all_errors)}")
+                lines_final.append("")
+                lines_final.append("=" * 70)
+                
+                self._print_to_terminal_append("\n".join(lines_final))
+                
+                # Mostrar mensaje de error
+                QtWidgets.QMessageBox.critical(
+                    self,
+                    "Errores de Compilación",
+                    f"Se encontraron {len(all_errors)} error(es) en total.\n\n"
+                    f"• Errores léxicos: {len(lexical_errors)}\n"
+                    f"• Errores sintácticos: {len(syntactic_errors)}\n\n"
+                    f"Consulta la terminal para ver los detalles completos."
+                )
                 lines_final.append("")
                 lines_final.append("Corrija los errores sintácticos antes de continuar.")
                 lines_final.append("")
@@ -456,7 +461,7 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
                 self._print_to_terminal_append("\n".join(lines_final))
                 
                 # Mostrar diálogo con resumen
-                self._show_syntax_error_dialog(parse_result['errors'])
+               #  self._show_syntax_error_dialog(parse_result['errors'])
                 
         except Exception as e:
             error_msg = (
