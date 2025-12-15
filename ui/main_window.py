@@ -271,7 +271,6 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
         """Establecer contenido de bienvenida"""
         welcome_text = """# Bienvenido a snaptics
 #        Presiona Ctrl + H para ayuda.
-
 """
         self.ui.code_txt.setPlainText(welcome_text)
     

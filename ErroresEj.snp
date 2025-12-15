@@ -1,0 +1,27 @@
+# Test de errores sintácticos
+
+# Error 1: WHERE mal posicionado (debería ser: where promedio_parcial < 80)
+dataset alumnos_foco = select asistencia, calificacion !
+                        from alumnos_raw
+                        promedio_parcial where < 80
+
+# Esta debería compilar bien
+dataset alumnos_raw = import from "alumnos.csv"
+
+# Error 2: Falta el = en fact
+fact asistencia_critica P(asistencia < 60)
+
+# Esta debería compilar bien
+fact promedio_bajo = P(promedio_parcial < 60)
+
+# Error 3: Sintaxis incorrecta en rule (falta ID después de rule)
+rule = if asistencia < 0.6 then P(reprobar > 0.8)
+
+# Esta debería compilar bien  
+rule riesgo_alto = if asistencia < 0.6 then P(reprobar > 0.8)
+
+# Error 4: Query sin ID
+query
+
+# Esta debería compilar bien
+query riesgo_alto
