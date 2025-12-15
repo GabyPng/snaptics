@@ -53,21 +53,35 @@ def p_programa(p):
     '''programa : sentencia
                 | programa sentencia'''
     if len(p) == 2:
-        p[0] = ASTNode('Programa', sentencias=[p[1]], line=p.lineno(1) if p[1] else 0)
+        # Filtrar None (errores)
+        if p[1] is not None:
+            p[0] = ASTNode('Programa', sentencias=[p[1]], line=p.lineno(1) if p[1] else 0)
+        else:
+            p[0] = ASTNode('Programa', sentencias=[], line=0)
     else:
         if p[1]:
-            p[1].properties['sentencias'].append(p[2])
+            # Filtrar None (errores)
+            if p[2] is not None:
+                p[1].properties['sentencias'].append(p[2])
             p[0] = p[1]
         else: # pragma: no cover
-            p[0] = ASTNode('Programa', sentencias=[p[2]], line=p.lineno(1) if p[2] else 0)
+            if p[2] is not None:
+                p[0] = ASTNode('Programa', sentencias=[p[2]], line=p.lineno(1) if p[2] else 0)
+            else:
+                p[0] = ASTNode('Programa', sentencias=[], line=0)
 
 def p_sentencia(p):
     '''sentencia : importacion
                  | preprocesamiento
                  | declaracion_hecho
                  | declaracion_regla
-                 | consulta'''
-    p[0] = p[1]
+                 | consulta
+                 | error'''
+    # Si es un error, retornar None para que no se agregue al AST
+    if len(p) == 2 and p.slice[1].type == 'error':
+        p[0] = None
+    else:
+        p[0] = p[1]
 
 def p_importacion(p):
     '''importacion : DATASET ID ASIG IMPORT FROM STRING'''
@@ -306,45 +320,88 @@ def p_empty(p):
 # ==================== MANEJO DE ERRORES ====================
 
 def p_error(p):
-    """Maneja errores sintácticos con panic mode recovery"""
+    """Maneja errores sintácticos con panic mode recovery.
+    
+    Esta función registra el error y permite que la gramática continúe
+    procesando con la regla 'sentencia : error'.
+    """
     if p:
+        # Obtener contexto del parser state
+        context = _get_parser_context(p)
+        
+        # Construir mensaje de error descriptivo
+        message = _build_error_message(p, context)
+        
         error = {
             'type': 'syntax_error',
             'line': p.lineno,
             'column': find_column(p),
             'token': p.type,
             'value': p.value,
-            'message': f"Error de sintaxis: token inesperado '{p.value}' (tipo: {p.type})"
+            'message': message,
+            'context': context
         }
         parser.errors.append(error)
-        
-        # Panic mode recovery: descartar tokens hasta encontrar un punto de sincronización
-        # Puntos de sincronización: inicio de nuevas declaraciones o fin de línea
-        sync_tokens = {'DATASET', 'FACT', 'RULE', 'QUERY'}
-        
-        # Descartar el token problemático y buscar un punto de sincronización
-        while True:
-            tok = parser.token()
-            if not tok:
-                # Llegamos al final del archivo
-                break
-            if tok.type in sync_tokens:
-                # Encontramos un punto de sincronización, devolver el token para continuar
-                parser.errok()
-                return tok
-        
-        # Si no encontramos un punto de sincronización, resetear el parser
-        parser.errok()
     else:
+        # Error al final del archivo
         error = {
             'type': 'syntax_error',
             'line': 'EOF',
             'column': 0,
             'token': 'EOF',
             'value': None,
-            'message': "Error de sintaxis: final inesperado del archivo"
+            'message': "Final inesperado del archivo. Puede que falte cerrar una estructura o completar una declaración.",
+            'context': "fin de archivo"
         }
         parser.errors.append(error)
+
+def _get_parser_context(p):
+    """Determina el contexto del parser basado en el estado actual."""
+    # Mapeo de tipos de tokens a contextos conocidos
+    token_context_map = {
+        'DATASET': 'declaración de dataset',
+        'FACT': 'declaración de hecho',
+        'RULE': 'declaración de regla',
+        'QUERY': 'consulta',
+        'SELECT': 'selección de datos',
+        'WHERE': 'condición WHERE',
+        'GROUPBY': 'agrupación',
+        'DISCOVER': 'descubrimiento de reglas',
+        'IF': 'condición IF',
+        'GIVEN': 'condición GIVEN',
+        'IMPORT': 'importación de datos',
+        'FROM': 'cláusula FROM',
+    }
+    
+    # Intentar determinar contexto por el token actual
+    token_type = p.type if hasattr(p, 'type') else None
+    if token_type in token_context_map:
+        return token_context_map[token_type]
+    
+    # Contexto genérico
+    return "expresión"
+
+def _build_error_message(p, context):
+    """Construye un mensaje de error descriptivo basado en el token y contexto."""
+    token_value = p.value if hasattr(p, 'value') else '?'
+    token_type = p.type if hasattr(p, 'type') else '?'
+    
+    # Mensajes específicos según el tipo de token
+    specific_messages = {
+        'ID': f"Identificador '{token_value}' inesperado en {context}",
+        'NUMBER': f"Número '{token_value}' inesperado en {context}",
+        'STRING': f"Cadena '{token_value}' inesperada en {context}",
+        'COMMA': f"Coma inesperada en {context}. Puede que falte un operando",
+        'LPAREN': f"Paréntesis de apertura inesperado en {context}",
+        'RPAREN': f"Paréntesis de cierre inesperado en {context}. Puede que falte el paréntesis de apertura",
+        'ASIG': f"Operador de asignación '=' inesperado en {context}",
+    }
+    
+    if token_type in specific_messages:
+        return specific_messages[token_type]
+    
+    # Mensaje genérico pero informativo
+    return f"Token inesperado '{token_value}' (tipo: {token_type}) en {context}"
 
 def find_column(token):
     """Encuentra la columna de un token"""
