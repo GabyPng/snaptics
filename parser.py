@@ -306,7 +306,7 @@ def p_empty(p):
 # ==================== MANEJO DE ERRORES ====================
 
 def p_error(p):
-    """Maneja errores sintácticos"""
+    """Maneja errores sintácticos con panic mode recovery"""
     if p:
         error = {
             'type': 'syntax_error',
@@ -317,6 +317,23 @@ def p_error(p):
             'message': f"Error de sintaxis: token inesperado '{p.value}' (tipo: {p.type})"
         }
         parser.errors.append(error)
+        
+        # Panic mode recovery: descartar tokens hasta encontrar un punto de sincronización
+        # Puntos de sincronización: inicio de nuevas declaraciones o fin de línea
+        sync_tokens = {'DATASET', 'FACT', 'RULE', 'QUERY'}
+        
+        # Descartar el token problemático y buscar un punto de sincronización
+        while True:
+            tok = parser.token()
+            if not tok:
+                # Llegamos al final del archivo
+                break
+            if tok.type in sync_tokens:
+                # Encontramos un punto de sincronización, devolver el token para continuar
+                parser.errok()
+                return tok
+        
+        # Si no encontramos un punto de sincronización, resetear el parser
         parser.errok()
     else:
         error = {
@@ -407,26 +424,39 @@ def print_ast(node, indent=0):
     else:
         print(f"{prefix}{node}")
 
-def format_syntax_errors(errors: List[Dict]) -> str:
-    """Formatea errores sintácticos para mostrar en consola"""
+def format_syntax_errors(errors: List[Dict], source_text: str = "") -> str:
+    """Formatea errores sintácticos para mostrar en consola, similar al formato léxico"""
     if not errors:
         return ""
     
     lines = []
-    lines.append("=" * 70)
-    lines.append(f"  SE ENCONTRARON {len(errors)} ERROR(ES) SINTÁCTICO(S)")
-    lines.append("=" * 70)
-    lines.append("")
+    source_lines = source_text.splitlines() if source_text else []
     
-    for i, error in enumerate(errors, 1):
-        lines.append(f"[Error #{i}]")
-        if error.get('line') == 'EOF':
-            lines.append(f"  Posición: Final del archivo")
+    for error in errors:
+        line_num = error.get('line')
+        col_num = error.get('column', 1)
+        token_type = error.get('token', '?')
+        token_value = error.get('value', '')
+        message = error.get('message', 'Error desconocido')
+        
+        if line_num == 'EOF':
+            lines.append(f"Error sintáctico al final del archivo: {message}")
         else:
-            lines.append(f"  Línea {error.get('line', '?')}, Columna {error.get('column', '?')}")
-        lines.append(f"  Problema: {error.get('message', 'Error desconocido')}")
-        lines.append("")
-        lines.append("-" * 70)
-        lines.append("")
+            # Formato similar al léxico
+            lines.append(f"Error sintáctico en línea {line_num}, columna {col_num}: {message}")
+            
+            # Mostrar la línea de código si está disponible
+            if source_lines and isinstance(line_num, int) and 0 < line_num <= len(source_lines):
+                line_text = source_lines[line_num - 1]
+                lines.append(f"  {line_text}")
+                # Indicador de posición
+                if isinstance(col_num, int) and col_num > 0:
+                    lines.append(f"  {' ' * (col_num - 1)}^")
+            
+            # Sugerencia basada en el tipo de error
+            if token_value:
+                lines.append(f"  Token problemático: '{token_value}' (tipo: {token_type})")
+        
+        lines.append("")  # Línea en blanco entre errores
     
     return "\n".join(lines)

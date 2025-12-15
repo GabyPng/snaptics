@@ -7,6 +7,7 @@ from PyQt6 import QtCore, QtWidgets, QtGui
 import traceback
 import lexer # NO MOVER !!
 import parser as syntax_parser
+from parser import ASTNode
 from .ui_base import Ui_snaptics
 from .tokens_panel import TokensPanel
 from .terminal_controller import TerminalController
@@ -52,7 +53,7 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
 
     def _install_code_editor(self):
         """Reemplaza el QPlainTextEdit generado por la UI con nuestro CodeEditor que
-        soporta numeración de líneas y otras utilidades."""
+        soporta numeración de líneas y otras utilidades. También crea un sistema de pestañas."""
         # Import aquí para evitar ciclos si se importa UI antes
         class LineNumberArea(QtWidgets.QWidget):
             def __init__(self, editor):
@@ -146,12 +147,43 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
         parent = old.parent()
         if parent is None:
             return
+        
+        # Crear el editor de código
         new_editor = CodeEditor(parent)
         new_editor.setObjectName('code_txt')
         new_editor.setPlainText(old.toPlainText())
         # Copy font, tab stops and other properties
         new_editor.setFont(old.font())
         new_editor.setTabStopDistance(old.tabStopDistance())
+        
+        # Crear el visor del AST como árbol jerárquico
+        self.ast_viewer = QtWidgets.QTreeWidget(parent)
+        self.ast_viewer.setObjectName('ast_viewer')
+        self.ast_viewer.setColumnCount(3)
+        self.ast_viewer.setHeaderLabels(["Nodo", "Valor", "Línea"])
+        self.ast_viewer.setAlternatingRowColors(True)
+        self.ast_viewer.setExpandsOnDoubleClick(True)
+        self.ast_viewer.header().setStretchLastSection(False)
+        self.ast_viewer.header().setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeMode.Stretch)
+        self.ast_viewer.header().setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeMode.Interactive)
+        self.ast_viewer.header().setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        
+        # Configurar color de selección y hover similar al del editor de código
+        self.ast_viewer.setStyleSheet("""
+            QTreeWidget::item:selected {
+                background-color: rgb(220, 235, 255);
+                color: black;
+            }
+            QTreeWidget::item:selected:!active {
+                background-color: rgb(220, 235, 255);
+                color: black;
+            }
+            QTreeWidget::item:hover {
+                background-color: rgb(220, 235, 255);
+                color: black;
+            }
+        """)
+        
         # Find and replace within parent layout
         layout = parent.layout()
         if layout is not None:
@@ -159,9 +191,34 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
                 it = layout.itemAt(i)
                 if it is not None and it.widget() is old:
                     layout.insertWidget(i, new_editor)
+                    layout.insertWidget(i + 1, self.ast_viewer)
                     layout.removeWidget(old)
                     old.setParent(None)
+                    # Ocultar el AST viewer inicialmente
+                    self.ast_viewer.hide()
                     break
+        
+        # Usar el tabBar existente de la UI para las pestañas
+        if hasattr(self.ui, 'tabBar'):
+            # Limpiar el tab existente y recrearlo con las dos vistas
+            self.ui.tabBar.clear()
+            # Crear contenedor para Code
+            code_widget = QtWidgets.QWidget()
+            code_layout = QtWidgets.QVBoxLayout(code_widget)
+            code_layout.setContentsMargins(5, 5, 5, 5)
+            code_layout.addWidget(new_editor)
+            self.ui.tabBar.addTab(code_widget, "Code")
+            
+            # Crear contenedor para AST
+            ast_widget = QtWidgets.QWidget()
+            ast_layout = QtWidgets.QVBoxLayout(ast_widget)
+            ast_layout.setContentsMargins(5, 5, 5, 5)
+            ast_layout.addWidget(self.ast_viewer)
+            self.ui.tabBar.addTab(ast_widget, "AST")
+            
+            # Mostrar el AST viewer ya que está en un tab
+            self.ast_viewer.show()
+        
         self.ui.code_txt = new_editor
     
     def _connect_signals(self):
@@ -254,17 +311,7 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
                     self.tokens_panel.clear()
                 return
 
-            # ========== ENCABEZADO DE COMPILACIÓN ==========
-            lines = []
-            lines.append("=" * 70)
-            lines.append("INICIANDO COMPILACIÓN")
-            lines.append("=" * 70)
-            lines.append("")
-            
-            # ========== FASE 1: ANÁLISIS LÉXICO ==========
-            lines.append("FASE 1: ANÁLISIS LÉXICO")
-            lines.append("-" * 70)
-            
+            # Ejecutar análisis léxico
             lex_result = lexer.tokenize(text)
             
             # Guardar tokens para tabla de símbolos
@@ -273,195 +320,75 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
             except Exception:
                 self.last_tokens = []
 
-            # Verificar errores léxicos
-            lexical_errors = lex_result['errors']
-            has_lexical_errors = len(lexical_errors) > 0
-            
-            # Mostrar resumen de tokens
-            num_tokens = len(lex_result['tokens'])
-            num_lines = text.count('\n') + 1
-            
-            lines.append("")
-            lines.append(f"✓ Análisis léxico completado")
-            lines.append(f"  Tokens generados: {num_tokens}")
-            lines.append(f"  Líneas procesadas: {num_lines}")
-            lines.append("")
-            
-            # Mostrar tabla de tokens
-            lines.append("Tokens identificados:")
-            lines.append("-" * 70)
-            header = f"{'LINE':>4} {'COL':>4} {'TYPE':<20} VALUE"
-            lines.append(header)
-            lines.append("-" * 70)
-            
-            for t in lex_result['tokens']:
-                val = t['value']
-                sval = repr(val)
-                if len(sval) > 40:
-                    sval = sval[:37] + '...'
-                lines.append(f"{t['line']:>4} {t['column']:>4} {t['type']:<20} {sval}")
-            
-            if not lex_result['tokens']:
-                lines.append("(Sin tokens)")
-            
-            lines.append("")
-            
             # Actualizar panel de tokens
             if hasattr(self, 'tokens_panel'):
                 self.tokens_panel.set_tokens(lex_result['tokens'])
                 if lex_result['tokens']:
                     self.tokens_dock.show()
+
+            # Verificar errores léxicos
+            lexical_errors = lex_result['errors']
+            has_lexical_errors = len(lexical_errors) > 0
             
-            # ========== FASE 2: ANÁLISIS SINTÁCTICO ==========
-            lines.append("")
-            lines.append("FASE 2: ANÁLISIS SINTÁCTICO")
-            lines.append("-" * 70)
-            
+            # Ejecutar análisis sintáctico
             parse_result = syntax_parser.parse(text)
-            
             syntactic_errors = parse_result['errors']
             has_syntactic_errors = len(syntactic_errors) > 0
             
-            if parse_result['success'] and not has_lexical_errors:
-                # Análisis sintáctico exitoso
-                lines.append("")
-                lines.append(f"Análisis sintáctico completado")
-                lines.append(f"  Se generó el Árbol de Sintaxis Abstracta (AST)")
-                lines.append("")
-                
-                # Mostrar estructura del AST
-                lines.append("Estructura del AST:")
-                lines.append("-" * 70)
-                
-                # Imprimir lo que tenemos hasta ahora
-                self._print_to_terminal("\n".join(lines))
-                
-                # Capturar output del AST
-                import io
-                import sys
-                
-                ast_output = io.StringIO()
-                old_stdout = sys.stdout
-                sys.stdout = ast_output
-                syntax_parser.print_ast(parse_result['ast'])
-                sys.stdout = old_stdout
-                
-                self._print_to_terminal_append(ast_output.getvalue())
-                
-                # Guardar el AST para uso posterior
-                self.last_ast = parse_result['ast']
-                
-                # ========== RESUMEN FINAL ==========
-                lines_final = []
-                lines_final.append("")
-                lines_final.append("=" * 70)
-                lines_final.append("COMPILACIÓN EXITOSA")
-                lines_final.append("=" * 70)
-                lines_final.append("")
-                lines_final.append("Resumen:")
-                lines_final.append(f"  • Fase léxica:      ✓ {num_tokens} tokens")
-                lines_final.append(f"  • Fase sintáctica:  ✓ AST generado")
-                lines_final.append(f"  • Líneas analizadas: {num_lines}")
-                lines_final.append("")
-                lines_final.append("=" * 70)
-                
-                self._print_to_terminal_append("\n".join(lines_final))
-                
-                # Mostrar mensaje de éxito
-                QtWidgets.QMessageBox.information(
-                    self,
-                    "Compilación Exitosa",
-                    f"La compilación se completó sin errores.\n\n"
-                    f"• Análisis léxico: {num_tokens} tokens\n"
-                    f"• Análisis sintáctico: AST generado\n\n"
-                    f"Consulta la terminal para ver los detalles completos."
-                )
-            else:
-                # Hay errores (léxicos o sintácticos)
-                all_errors = []
+            # Mostrar solo los errores
+            if has_lexical_errors or has_syntactic_errors:
+                lines = []
                 
                 if has_lexical_errors:
-                    lines.append("")
                     lines.append("✗ ERRORES LÉXICOS ENCONTRADOS")
                     lines.append("")
-                    # Agregar errores léxicos formateados
                     lexical_error_output = lexer.format_errors(lexical_errors)
                     lines.append(lexical_error_output)
-                    all_errors.extend(lexical_errors)
                 
-                if has_syntactic_errors and not has_lexical_errors:
-                    lines.append("")
+                if has_syntactic_errors:
+                    if has_lexical_errors:
+                        lines.append("")
                     lines.append("✗ ERRORES SINTÁCTICOS ENCONTRADOS")
                     lines.append("")
-                    
-                    # Formatear errores sintácticos
-                    for i, error in enumerate(syntactic_errors, 1):
-                        lines.append(f"[Error #{len(all_errors) + i}]")
-                        if error.get('line') == 'EOF':
-                            lines.append(f"  Posición: Final del archivo")
-                        else:
-                            lines.append(f"  Línea {error.get('line', '?')}, Columna {error.get('column', '?')}")
-                        
-                        token_type = error.get('token', '?')
-                        token_value = error.get('value', '')
-                        if token_value:
-                            lines.append(f"  Token problemático: '{token_value}' (tipo: {token_type})")
-                        else:
-                            lines.append(f"  Token problemático: {token_type}")
-                        
-                        lines.append(f"  Mensaje: {error.get('message', 'Error desconocido')}")
-                        lines.append("")
-                        lines.append("-" * 70)
-                        lines.append("")
-                    
-                    all_errors.extend(syntactic_errors)
-                elif has_syntactic_errors and has_lexical_errors:
-                    lines.append("")
-                    lines.append("⚠️  NOTA: Hay errores sintácticos adicionales, pero pueden ser")
-                    lines.append("   consecuencia de los errores léxicos. Corrija primero los")
-                    lines.append("   errores léxicos y vuelva a compilar.")
-                    lines.append("")
+                    syntactic_error_output = syntax_parser.format_syntax_errors(syntactic_errors, text)
+                    lines.append(syntactic_error_output)
                 
-                # Imprimir todo hasta ahora
                 self._print_to_terminal("\n".join(lines))
                 
-                # ========== RESUMEN FINAL CON ERRORES ==========
-                lines_final = []
-                lines_final.append("")
-                lines_final.append("=" * 70)
-                lines_final.append("COMPILACIÓN FALLIDA")
-                lines_final.append("=" * 70)
-                lines_final.append("")
-                lines_final.append("Resumen:")
-                lines_final.append(f"  • Fase léxica:      {'✗' if has_lexical_errors else '✓'} {num_tokens} tokens")
-                if has_lexical_errors:
-                    lines_final.append(f"  • Fase sintáctica:  ⚠️  Omitida (errores léxicos detectados)")
-                else:
-                    lines_final.append(f"  • Fase sintáctica:  {'✗' if has_syntactic_errors else '✓'} {len(syntactic_errors)} error(es)")
-                lines_final.append(f"  • Total errores:    {len(all_errors)}")
-                lines_final.append("")
-                lines_final.append("=" * 70)
-                
-                self._print_to_terminal_append("\n".join(lines_final))
-                
                 # Mostrar mensaje de error
+                total_errors = len(lexical_errors) + len(syntactic_errors)
                 QtWidgets.QMessageBox.critical(
                     self,
                     "Errores de Compilación",
-                    f"Se encontraron {len(all_errors)} error(es) en total.\n\n"
+                    f"Se encontraron {total_errors} error(es) en total.\n\n"
                     f"• Errores léxicos: {len(lexical_errors)}\n"
                     f"• Errores sintácticos: {len(syntactic_errors)}\n\n"
                     f"Consulta la terminal para ver los detalles completos."
                 )
-                lines_final.append("")
-                lines_final.append("Corrija los errores sintácticos antes de continuar.")
-                lines_final.append("")
-                lines_final.append("=" * 70)
+            else:
+                # Compilación exitosa - mostrar mensaje en terminal
+                self._print_to_terminal("Compilación exitosa")
                 
-                self._print_to_terminal_append("\n".join(lines_final))
+                # Guardar el AST para uso posterior
+                self.last_ast = parse_result['ast']
                 
-                # Mostrar diálogo con resumen
-               #  self._show_syntax_error_dialog(parse_result['errors'])
+                # Mostrar el AST en la pestaña correspondiente
+                self._display_ast(parse_result['ast'])
+                
+                # Cambiar automáticamente a la pestaña del AST
+                if hasattr(self.ui, 'tabBar'):
+                    self.ui.tabBar.setCurrentIndex(1)  # Índice 1 = pestaña AST
+                
+                # Mostrar mensaje de éxito
+                num_tokens = len(lex_result['tokens'])
+                QtWidgets.QMessageBox.information(
+                    self,
+                    "Compilación Exitosa",
+                    f"La compilación se completó sin errores.\n\n"
+                    f"• Tokens generados: {num_tokens}\n"
+                    f"• AST generado correctamente\n\n"
+                    f"El AST se muestra en la pestaña 'AST'."
+                )
                 
         except Exception as e:
             error_msg = (
@@ -476,6 +403,90 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
                 f"Ocurrió un error inesperado durante la compilación:\n\n{str(e)}"
             )
 
+    def _display_ast(self, ast):
+        """Mostrar el AST formateado en un árbol jerárquico."""
+        if not hasattr(self, 'ast_viewer'):
+            return
+        
+        try:
+            # Limpiar el árbol
+            self.ast_viewer.clear()
+            
+            # Crear el nodo raíz y construir el árbol
+            if ast:
+                self._build_ast_tree(ast, self.ast_viewer.invisibleRootItem())
+                # Expandir el primer nivel para mostrar la estructura principal
+                self.ast_viewer.expandToDepth(1)
+            
+        except Exception as e:
+            # Si falla, mostrar error en el árbol
+            error_item = QtWidgets.QTreeWidgetItem([f"Error: {str(e)}", "", ""])
+            self.ast_viewer.addTopLevelItem(error_item)
+    
+    def _build_ast_tree(self, node, parent_item):
+        """Construir recursivamente el árbol del AST."""
+        if node is None:
+            return
+        
+        if isinstance(node, ASTNode):
+            # Obtener el tipo y la línea
+            node_type = node.type
+            line = str(node.properties.get('line', '')) if node.properties.get('line') else ""
+            
+            # Crear item para este nodo
+            node_item = QtWidgets.QTreeWidgetItem(parent_item, [node_type, "", line])
+            node_item.setExpanded(False)
+            
+            # Agregar propiedades simples como hijos
+            for key, val in node.properties.items():
+                if key == 'line':
+                    continue
+                    
+                if isinstance(val, ASTNode):
+                    # Propiedad que es un nodo: crear un hijo con el nombre de la propiedad
+                    prop_item = QtWidgets.QTreeWidgetItem(node_item, [f"{key}", "", ""])
+                    self._build_ast_tree(val, prop_item)
+                    
+                elif isinstance(val, list):
+                    if not val:
+                        continue
+                    # Lista: crear un nodo contenedor
+                    list_item = QtWidgets.QTreeWidgetItem(node_item, [f"{key} ({len(val)} items)", "", ""])
+                    for idx, item in enumerate(val):
+                        if isinstance(item, ASTNode):
+                            self._build_ast_tree(item, list_item)
+                        else:
+                            # Item simple en la lista
+                            QtWidgets.QTreeWidgetItem(list_item, [f"[{idx}]", str(item), ""])
+                else:
+                    # Propiedad simple: mostrar como hijo directo
+                    QtWidgets.QTreeWidgetItem(node_item, [key, str(val), ""])
+        
+        elif isinstance(node, dict):
+            # Manejar diccionarios
+            node_type = node.get('type', 'Unknown')
+            line = str(node.get('line', '')) if node.get('line') else ""
+            
+            node_item = QtWidgets.QTreeWidgetItem(parent_item, [node_type, "", line])
+            node_item.setExpanded(False)
+            
+            for key, val in node.items():
+                if key in ['type', 'line']:
+                    continue
+                    
+                if isinstance(val, dict):
+                    prop_item = QtWidgets.QTreeWidgetItem(node_item, [f"{key}", "", ""])
+                    self._build_ast_tree(val, prop_item)
+                    
+                elif isinstance(val, list):
+                    if not val:
+                        continue
+                    list_item = QtWidgets.QTreeWidgetItem(node_item, [f"{key} ({len(val)} items)", "", ""])
+                    for item in val:
+                        self._build_ast_tree(item, list_item)
+                else:
+                    QtWidgets.QTreeWidgetItem(node_item, [key, str(val), ""])
+    
     # Método auxiliar para agregar texto sin limpiar
     def _print_to_terminal_append(self, text: str):
         """Agregar texto a la terminal sin limpiar el contenido anterior."""
