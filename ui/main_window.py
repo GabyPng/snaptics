@@ -288,7 +288,7 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
                 
                 lines_footer = []
                 lines_footer.append("")
-                lines_footer.append("⚠️  La compilación se detuvo en la fase léxica.")
+                lines_footer.append("La compilación se detuvo en la fase léxica.")
                 lines_footer.append("   Corrija los errores antes de continuar.")
                 lines_footer.append("")
                 lines_footer.append("=" * 70)
@@ -313,7 +313,7 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
             num_lines = text.count('\n') + 1
             
             lines.append("")
-            lines.append(f"✓ Análisis léxico completado")
+            lines.append(f"  Análisis léxico completado")
             lines.append(f"  Tokens generados: {num_tokens}")
             lines.append(f"  Líneas procesadas: {num_lines}")
             lines.append("")
@@ -383,7 +383,7 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
                 lines_final = []
                 lines_final.append("")
                 lines_final.append("=" * 70)
-                lines_final.append("COMPILACIÓN EXITOSA")
+                lines_final.append("¡COMPILACIÓN EXITOSA!")
                 lines_final.append("=" * 70)
                 lines_final.append("")
                 lines_final.append("Resumen:")
@@ -407,18 +407,22 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
             else:
                 # Hay errores sintácticos
                 num_errors = len(parse_result['errors'])
+                recovery_count = len(parse_result.get('recovery_info', []))
                 
                 lines.append("")
                 lines.append("✗ ERRORES SINTÁCTICOS ENCONTRADOS")
+                if recovery_count > 0:
+                    lines.append(f"   (Se intentaron {recovery_count} recuperación(es))")
                 lines.append("")
                 
                 # Imprimir lo que tenemos hasta ahora
                 self._print_to_terminal("\n".join(lines))
                 
-                # Formatear errores de forma similar al lexer
+                # Formatear errores de forma mejorada
                 error_lines = []
                 for i, error in enumerate(parse_result['errors'], 1):
                     error_lines.append(f"[Error #{i}]")
+                    
                     if error.get('line') == 'EOF':
                         error_lines.append(f"  Posición: Final del archivo")
                     else:
@@ -427,27 +431,49 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
                     token_type = error.get('token', '?')
                     token_value = error.get('value', '')
                     if token_value:
-                        error_lines.append(f"  Token problemático: '{token_value}' (tipo: {token_type})")
+                        error_lines.append(f"  Token: '{token_value}' (tipo: {token_type})")
                     else:
-                        error_lines.append(f"  Token problemático: {token_type}")
+                        error_lines.append(f"  Token: {token_type}")
                     
-                    error_lines.append(f"  Mensaje: {error.get('message', 'Error desconocido')}")
+                    error_lines.append(f"  Problema: {error.get('message', 'Error desconocido')}")
+                    
+                    # Agregar sugerencia si está disponible
+                    if error.get('suggestion'):
+                        error_lines.append(f"-- Sugerencia: {error['suggestion']}")
+                    
                     error_lines.append("")
                     error_lines.append("-" * 70)
                     error_lines.append("")
                 
                 self._print_to_terminal_append("\n".join(error_lines))
                 
+                # Mostrar información de recuperación si hay
+                if recovery_count > 0:
+                    recovery_lines = []
+                    recovery_lines.append("")
+                    recovery_lines.append("INFORMACIÓN DE RECUPERACIÓN:")
+                    recovery_lines.append("-" * 70)
+                    for i, rec in enumerate(parse_result['recovery_info'], 1):
+                        recovery_lines.append(f"  Recuperación #{i}:")
+                        recovery_lines.append(f"    Error en línea: {rec['error_line']}")
+                        recovery_lines.append(f"    Recuperado en línea: {rec['recovered_at']}")
+                        recovery_lines.append(f"    Tokens descartados: {rec['discarded_count']}")
+                        recovery_lines.append(f"    Token de sincronización: {rec['sync_token']}")
+                        recovery_lines.append("")
+                    self._print_to_terminal_append("\n".join(recovery_lines))
+                
                 # ========== RESUMEN FINAL CON ERRORES ==========
                 lines_final = []
                 lines_final.append("")
                 lines_final.append("=" * 70)
-                lines_final.append("COMPILACIÓN FALLIDA")
+                lines_final.append("✗ COMPILACIÓN FALLIDA")
                 lines_final.append("=" * 70)
                 lines_final.append("")
                 lines_final.append("Resumen:")
-                lines_final.append(f"  • Fase léxica:      ✓ {num_tokens} tokens")
-                lines_final.append(f"  • Fase sintáctica:  ✗ {num_errors} error(es)")
+                lines_final.append(f"  • Fase léxica:       {num_tokens} tokens")
+                lines_final.append(f"  • Fase sintáctica:   {num_errors} error(es)")
+                if recovery_count > 0:
+                    lines_final.append(f"  • Recuperaciones:   {recovery_count}")
                 lines_final.append("")
                 lines_final.append("Corrija los errores sintácticos antes de continuar.")
                 lines_final.append("")
@@ -526,7 +552,7 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
         <ul>
             <li><b>F9</b> - Compilar (Análisis Léxico + Sintáctico)</li>
             <li><b>Ctrl+J</b> - Alternar terminal</li>
-            <li><b>Ctrl+J</b> - Alternar tabla de Tokens</li>
+            <li><b>Ctrl+T</b> - Alternar tabla de Tokens</li>
             <li><b>F12</b> - Alternar tema</li>
         </ul>
         
@@ -642,164 +668,50 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
                 self.ui.code_txt.setExtraSelections([])
         else:
             self.ui.code_txt.setExtraSelections([])
-    # def _run_parser(self):
-    #     """Ejecutar el analizador sintáctico sobre el texto del editor."""
-    #     try:
-    #         text = self.ui.code_txt.toPlainText()
-    #         if not text.strip():
-    #             self._print_to_terminal("[Parser] No hay contenido para analizar.")
-    #             return
-
-    #         self._print_to_terminal("[Parser] Analizando sintaxis...\n")
-            
-    #         # Primero ejecutar el lexer para verificar errores léxicos
-    #         lex_result = lexer.tokenize(text)
-            
-    #         if lex_result['errors']:
-    #             # Si hay errores léxicos, mostrarlos y no continuar
-    #             error_output = lexer.format_errors(lex_result['errors'])
-    #             self._print_to_terminal(f"[Errores léxicos encontrados]\n{error_output}")
-    #             self._print_to_terminal("\n⚠️  Corrija los errores léxicos antes de continuar con el análisis sintáctico.")
-    #             return
-            
-    #         # Si no hay errores léxicos, proceder con el parser
-    #         parse_result = syntax_parser.parse(text)
-            
-    #         if parse_result['success']:
-    #             # Análisis exitoso
-    #             lines = []
-    #             lines.append("=" * 70)
-    #             lines.append("ANÁLISIS SINTÁCTICO COMPLETADO CON ÉXITO")
-    #             lines.append("=" * 70)
-    #             lines.append("")
-    #             lines.append("✓ El código es sintácticamente correcto")
-    #             lines.append("✓ Se generó el Árbol de Sintaxis Abstracta (AST)")
-    #             lines.append("")
-    #             lines.append("-" * 70)
-    #             lines.append("ESTRUCTURA DEL AST:")
-    #             lines.append("-" * 70)
-    #             lines.append("")
-                
-    #             # Convertir AST a texto para mostrar
-    #             import io
-    #             import sys
-                
-    #             ast_output = io.StringIO()
-    #             old_stdout = sys.stdout
-    #             sys.stdout = ast_output
-    #             syntax_parser.print_ast(parse_result['ast'])
-    #             sys.stdout = old_stdout
-                
-    #             lines.append(ast_output.getvalue())
-    #             lines.append("")
-    #             lines.append("=" * 70)
-                
-    #             output = "\n".join(lines)
-    #             self._print_to_terminal(output)
-                
-    #             # Guardar el AST para uso posterior
-    #             self.last_ast = parse_result['ast']
-                
-    #             # Mostrar mensaje de éxito
-    #             QtWidgets.QMessageBox.information(
-    #                 self,
-    #                 "Análisis Sintáctico Exitoso",
-    #                 f"El código es sintácticamente correcto.\n\n"
-    #                 f"Se ha generado el Árbol de Sintaxis Abstracta.\n"
-    #                 f"Consulta la terminal para ver los detalles."
-    #             )
-    #         else:
-    #             # Hay errores sintácticos
-    #             num_errors = len(parse_result['errors'])
-                
-    #             lines = []
-    #             lines.append("=" * 70)
-    #             lines.append("ANÁLISIS SINTÁCTICO FALLIDO")
-    #             lines.append("=" * 70)
-    #             lines.append("")
-    #             lines.append(f"Total de errores encontrados: {num_errors}")
-    #             lines.append("")
-    #             lines.append("-" * 70)
-    #             lines.append("")
-                
-    #             # Formatear errores de forma similar al lexer
-    #             for i, error in enumerate(parse_result['errors'], 1):
-    #                 lines.append(f"[Error #{i}]")
-    #                 if error.get('line') == 'EOF':
-    #                     lines.append(f"  Posición: Final del archivo")
-    #                 else:
-    #                     lines.append(f"  Línea {error.get('line', '?')}, Columna {error.get('column', '?')}")
-                    
-    #                 token_type = error.get('token', '?')
-    #                 token_value = error.get('value', '')
-    #                 if token_value:
-    #                     lines.append(f"  Token problemático: '{token_value}' (tipo: {token_type})")
-    #                 else:
-    #                     lines.append(f"  Token problemático: {token_type}")
-                    
-    #                 lines.append(f"  Mensaje: {error.get('message', 'Error desconocido')}")
-    #                 lines.append("")
-    #                 lines.append("-" * 70)
-    #                 lines.append("")
-                
-    #             output = "\n".join(lines)
-    #             self._print_to_terminal(output)
-                
-    #             # Mostrar diálogo con resumen
-    #             self._show_syntax_error_dialog(parse_result['errors'])
-                
-    #     except Exception as e:
-    #         error_msg = (
-    #             f"[ERROR CRÍTICO] Falló el análisis sintáctico:\n\n"
-    #             f"{str(e)}\n\n"
-    #             f"Traceback:\n{traceback.format_exc()}"
-    #         )
-    #         self._print_to_terminal(error_msg)
-    #         QtWidgets.QMessageBox.critical(
-    #             self,
-    #             "Error Crítico",
-    #             f"Ocurrió un error inesperado durante el análisis:\n\n{str(e)}"
-    #         )
+    
 
     def _show_syntax_error_dialog(self, errors):
         """Muestra un diálogo con los errores sintácticos."""
         num_errors = len(errors)
         
-        msg = f"""
-        <h3>Errores Sintácticos Detectados</h3>
-        <p><b>Total de errores:</b> <b style="color: #d32f2f;">{num_errors}</b></p>
-        
-        <p><b>Primeros errores:</b></p>
-        <table style="font-family: monospace; font-size: 11px;">
-        """
+        msg = f"""<h3>Errores Sintácticos Detectados</h3>
+    <p><b>Total de errores:</b> <b style="color: #d32f2f;">{num_errors}</b></p>
+
+    <p><b>Primeros errores:</b></p>
+    <table style="font-family: monospace; font-size: 11px;">
+    """
         
         for i, err in enumerate(errors[:5], 1):
             line = err.get('line', '?')
             col = err.get('column', '?')
-            token = err.get('token', '?')
+            message = err.get('message', 'Error desconocido')
+            
+            # Acortar mensaje si es muy largo
+            if len(message) > 60:
+                message = message[:57] + "..."
             
             msg += f"""
-            <tr>
-                <td style="padding: 4px;"><b>{i}.</b></td>
-                <td style="padding: 4px;">Línea {line}, Col {col}</td>
-                <td style="padding: 4px; color: #d32f2f;">{token}</td>
-            </tr>
-            """
+    <tr>
+        <td style="padding: 4px;"><b>{i}.</b></td>
+        <td style="padding: 4px;">Línea {line}, Col {col}</td>
+        <td style="padding: 4px; color: #d32f2f;">{message}</td>
+    </tr>
+    """
         
         if num_errors > 5:
             msg += f"""
-            <tr>
-                <td colspan="3" style="padding: 4px;">
-                    <i>... y {num_errors - 5} error(es) más</i>
-                </td>
-            </tr>
-            """
+    <tr>
+        <td colspan="3" style="padding: 4px;">
+            <i>... y {num_errors - 5} error(es) más</i>
+        </td>
+    </tr>
+    """
         
         msg += """
-        </table>
-        <br>
-        <p><i>Consulta la terminal para ver los detalles completos.</i></p>
-        """
+    </table>
+    <br>
+    <p><i>Consulta la terminal para ver los detalles completos.</i></p>
+    """
         
         msg_box = QtWidgets.QMessageBox(self)
         msg_box.setIcon(QtWidgets.QMessageBox.Icon.Warning)
