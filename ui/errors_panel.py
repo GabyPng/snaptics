@@ -132,9 +132,9 @@ class ErrorsPanel(QtWidgets.QDialog):
 			{
 				'id': 'LEX-302',
                 'nombre': 'Símbolo barra invertida',
-				'descripcion': 'El símbolo \ solo es válido dentro de cadenas',
-				'ejemplo': 'path "\" to "\" file',
-                'solucion': 'Reemplazar o eliminar el símbolo "\"'
+				'descripcion': 'El símbolo \\ solo es válido dentro de cadenas',
+				'ejemplo': 'path \\ to \\ file',
+				'solucion': 'Reemplazar o eliminar el símbolo \\'
             },
 			
             # ========= Errores de caracteres =========
