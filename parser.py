@@ -5,10 +5,67 @@ from typing import Dict, Any, List
 """
 Analizador Sintáctico para snaptics
 Análisis de datos probabilístico con razonamiento lógico
-
-TODO
--
 """
+
+# ==================== CÓDIGOS Y CATEGORÍAS DE ERRORES SINTÁCTICOS ====================
+
+class SyntaxErrorCode:
+    """Códigos de error sintáctico del compilador snaptics"""
+    
+    # Errores de declaraciones (SYN-100 series)
+    INCOMPLETE_DATASET = ("SYN-101", "Declaración de dataset incompleta")
+    INCOMPLETE_FACT = ("SYN-102", "Declaración de hecho incompleta")
+    INCOMPLETE_RULE = ("SYN-103", "Declaración de regla incompleta")
+    INCOMPLETE_QUERY = ("SYN-104", "Declaración de consulta incompleta")
+    MISSING_ASSIGNMENT = ("SYN-105", "Falta operador de asignación")
+    
+    # Errores de expresiones (SYN-200 series)
+    MISSING_OPERAND = ("SYN-201", "Falta operando en expresión")
+    INVALID_EXPRESSION = ("SYN-202", "Expresión inválida")
+    MISSING_OPERATOR = ("SYN-203", "Falta operador")
+    UNEXPECTED_TOKEN = ("SYN-204", "Token inesperado en expresión")
+    
+    # Errores de paréntesis y delimitadores (SYN-300 series)
+    MISSING_LPAREN = ("SYN-301", "Falta paréntesis de apertura")
+    MISSING_RPAREN = ("SYN-302", "Falta paréntesis de cierre")
+    UNMATCHED_PAREN = ("SYN-303", "Paréntesis sin correspondencia")
+    MISSING_COMMA = ("SYN-304", "Falta coma en lista")
+    UNEXPECTED_COMMA = ("SYN-305", "Coma inesperada")
+    
+    # Errores de cláusulas (SYN-400 series)
+    MISSING_FROM = ("SYN-401", "Falta cláusula FROM")
+    MISSING_WHERE = ("SYN-402", "Condición WHERE incompleta")
+    INVALID_SELECT = ("SYN-403", "Cláusula SELECT inválida")
+    MISSING_GIVEN = ("SYN-404", "Falta cláusula GIVEN en probabilidad condicional")
+    
+    # Errores de identificadores (SYN-500 series)
+    MISSING_IDENTIFIER = ("SYN-501", "Falta identificador")
+    INVALID_IDENTIFIER = ("SYN-502", "Identificador inválido")
+    DUPLICATE_IDENTIFIER = ("SYN-503", "Identificador duplicado")
+    
+    # Errores de valores y literales (SYN-600 series)
+    MISSING_VALUE = ("SYN-601", "Falta valor")
+    INVALID_NUMBER = ("SYN-602", "Número inválido")
+    INVALID_STRING = ("SYN-603", "Cadena inválida")
+    MISSING_STRING = ("SYN-604", "Falta cadena de texto")
+    
+    # Errores de operadores (SYN-700 series)
+    INVALID_OPERATOR = ("SYN-701", "Operador inválido")
+    MISSING_RELATIONAL_OP = ("SYN-702", "Falta operador relacional")
+    INVALID_LOGICAL_OP = ("SYN-703", "Operador lógico inválido")
+    
+    # Errores de probabilidad (SYN-800 series)
+    INVALID_PROBABILITY = ("SYN-801", "Expresión de probabilidad inválida")
+    MISSING_PROB_CONDITION = ("SYN-802", "Falta condición en probabilidad")
+    INVALID_PROB_SYNTAX = ("SYN-803", "Sintaxis de probabilidad incorrecta")
+    
+    # Errores de estructura (SYN-900 series)
+    UNEXPECTED_EOF = ("SYN-901", "Final inesperado del archivo")
+    INCOMPLETE_STATEMENT = ("SYN-902", "Declaración incompleta")
+    INVALID_SYNTAX = ("SYN-903", "Sintaxis inválida")
+    
+    # Error genérico (SYN-999)
+    GENERIC_ERROR = ("SYN-999", "Error sintáctico")
 
 # ==================== PRECEDENCIA Y ASOCIATIVIDAD ====================
 precedence = (
@@ -64,7 +121,7 @@ def p_programa(p):
             if p[2] is not None:
                 p[1].properties['sentencias'].append(p[2])
             p[0] = p[1]
-        else: # pragma: no cover
+        else:
             if p[2] is not None:
                 p[0] = ASTNode('Programa', sentencias=[p[2]], line=p.lineno(1) if p[2] else 0)
             else:
@@ -104,9 +161,9 @@ def p_preprocesamiento_completo(p):
 def p_lista_ids(p):
     '''lista_ids : ID
                  | ID COMMA lista_ids'''
-    if len(p) == 2:  # Regla: lista_ids : ID
+    if len(p) == 2:
         p[0] = [p[1]]
-    else:  # Regla: lista_ids : ID COMMA lista_ids
+    else:
         p[0] = [p[1]] + p[3]
 
 def p_condicion_opt(p):
@@ -320,20 +377,21 @@ def p_empty(p):
 # ==================== MANEJO DE ERRORES ====================
 
 def p_error(p):
-    """Maneja errores sintácticos con panic mode recovery.
-    
-    Esta función registra el error y permite que la gramática continúe
-    procesando con la regla 'sentencia : error'.
-    """
+    """Maneja errores sintácticos con categorización y códigos de error."""
     if p:
-        # Obtener contexto del parser state
+        # Obtener contexto del parser
         context = _get_parser_context(p)
+        
+        # Determinar código de error basado en el contexto
+        error_code, error_category = _determine_error_code(p, context)
         
         # Construir mensaje de error descriptivo
         message = _build_error_message(p, context)
         
         error = {
             'type': 'syntax_error',
+            'code': error_code,
+            'category': error_category,
             'line': p.lineno,
             'column': find_column(p),
             'token': p.type,
@@ -344,8 +402,11 @@ def p_error(p):
         parser.errors.append(error)
     else:
         # Error al final del archivo
+        code, category = SyntaxErrorCode.UNEXPECTED_EOF
         error = {
             'type': 'syntax_error',
+            'code': code,
+            'category': category,
             'line': 'EOF',
             'column': 0,
             'token': 'EOF',
@@ -355,9 +416,85 @@ def p_error(p):
         }
         parser.errors.append(error)
 
+def _determine_error_code(p, context):
+    """Determina el código de error apropiado basado en el token y contexto."""
+    token_type = p.type if hasattr(p, 'type') else None
+    token_value = p.value if hasattr(p, 'value') else None
+    
+    # Mapeo de contextos y tokens a códigos de error
+    
+    # Errores de paréntesis
+    if token_type == 'RPAREN':
+        return SyntaxErrorCode.UNMATCHED_PAREN
+    elif token_type == 'LPAREN':
+        return SyntaxErrorCode.MISSING_RPAREN
+    
+    # Errores en declaraciones
+    if 'dataset' in context.lower():
+        if token_type == 'ASIG':
+            return SyntaxErrorCode.MISSING_IDENTIFIER
+        elif token_type in ('IMPORT', 'SELECT'):
+            return SyntaxErrorCode.MISSING_ASSIGNMENT
+        return SyntaxErrorCode.INCOMPLETE_DATASET
+    
+    if 'hecho' in context.lower() or 'fact' in context.lower():
+        if token_type == 'ASIG':
+            return SyntaxErrorCode.MISSING_IDENTIFIER
+        return SyntaxErrorCode.INCOMPLETE_FACT
+    
+    if 'regla' in context.lower() or 'rule' in context.lower():
+        if token_type == 'COND':
+            return SyntaxErrorCode.MISSING_IDENTIFIER
+        return SyntaxErrorCode.INCOMPLETE_RULE
+    
+    if 'consulta' in context.lower() or 'query' in context.lower():
+        return SyntaxErrorCode.INCOMPLETE_QUERY
+    
+    # Errores en expresiones
+    if 'expresión' in context.lower():
+        if token_type in ('ADD', 'SUB', 'MUL', 'DIV', 'POW'):
+            return SyntaxErrorCode.MISSING_OPERAND
+        elif token_type in ('EQ', 'NEQ', 'LESSTHAN', 'GREATERTHAN', 'LEQ', 'GEQ'):
+            return SyntaxErrorCode.MISSING_OPERAND
+        elif token_type == 'COMMA':
+            return SyntaxErrorCode.UNEXPECTED_COMMA
+        return SyntaxErrorCode.INVALID_EXPRESSION
+    
+    # Errores de comas
+    if token_type == 'COMMA':
+        return SyntaxErrorCode.UNEXPECTED_COMMA
+    
+    # Errores de FROM
+    if context == 'cláusula FROM' or token_type == 'FROM':
+        return SyntaxErrorCode.MISSING_FROM
+    
+    # Errores de WHERE
+    if context == 'condición WHERE' or token_type == 'WHERE':
+        return SyntaxErrorCode.MISSING_WHERE
+    
+    # Errores de GIVEN (probabilidad condicional)
+    if token_type == 'GIVEN':
+        return SyntaxErrorCode.MISSING_GIVEN
+    
+    # Errores de probabilidad
+    if 'prob' in context.lower() or token_type == 'PROB':
+        return SyntaxErrorCode.INVALID_PROBABILITY
+    
+    # Errores de identificadores
+    if token_type == 'ID':
+        return SyntaxErrorCode.INVALID_IDENTIFIER
+    
+    # Errores de valores
+    if token_type in ('INT', 'REAL'):
+        return SyntaxErrorCode.INVALID_NUMBER
+    elif token_type == 'STRING':
+        return SyntaxErrorCode.INVALID_STRING
+    
+    # Error genérico si no se puede determinar
+    return SyntaxErrorCode.UNEXPECTED_TOKEN
+
 def _get_parser_context(p):
     """Determina el contexto del parser basado en el estado actual."""
-    # Mapeo de tipos de tokens a contextos conocidos
     token_context_map = {
         'DATASET': 'declaración de dataset',
         'FACT': 'declaración de hecho',
@@ -365,20 +502,23 @@ def _get_parser_context(p):
         'QUERY': 'consulta',
         'SELECT': 'selección de datos',
         'WHERE': 'condición WHERE',
-        'GROUPBY': 'agrupación',
-        'DISCOVER': 'descubrimiento de reglas',
+        'GROUP': 'agrupación',
+        'AUTO_DISCOVER': 'descubrimiento de reglas',
         'IF': 'condición IF',
         'GIVEN': 'condición GIVEN',
         'IMPORT': 'importación de datos',
         'FROM': 'cláusula FROM',
+        'PROB': 'probabilidad',
+        'MEAN': 'métrica estadística',
+        'VAR': 'métrica estadística',
+        'STD': 'métrica estadística',
+        'CORRELATION': 'métrica estadística',
     }
     
-    # Intentar determinar contexto por el token actual
     token_type = p.type if hasattr(p, 'type') else None
     if token_type in token_context_map:
         return token_context_map[token_type]
     
-    # Contexto genérico
     return "expresión"
 
 def _build_error_message(p, context):
@@ -389,12 +529,30 @@ def _build_error_message(p, context):
     # Mensajes específicos según el tipo de token
     specific_messages = {
         'ID': f"Identificador '{token_value}' inesperado en {context}",
-        'NUMBER': f"Número '{token_value}' inesperado en {context}",
+        'INT': f"Número '{token_value}' inesperado en {context}",
+        'REAL': f"Número '{token_value}' inesperado en {context}",
         'STRING': f"Cadena '{token_value}' inesperada en {context}",
         'COMMA': f"Coma inesperada en {context}. Puede que falte un operando",
         'LPAREN': f"Paréntesis de apertura inesperado en {context}",
         'RPAREN': f"Paréntesis de cierre inesperado en {context}. Puede que falte el paréntesis de apertura",
         'ASIG': f"Operador de asignación '=' inesperado en {context}",
+        'ADD': f"Operador '+' inesperado. Puede que falte un operando",
+        'SUB': f"Operador '-' inesperado. Puede que falte un operando",
+        'MUL': f"Operador '*' inesperado. Puede que falte un operando",
+        'DIV': f"Operador '/' inesperado. Puede que falte un operando",
+        'POW': f"Operador '^' inesperado. Puede que falte un operando",
+        'EQ': f"Operador '==' inesperado. Puede que falte un operando",
+        'NEQ': f"Operador '!=' inesperado. Puede que falte un operando",
+        'LESSTHAN': f"Operador '<' inesperado. Puede que falte un operando",
+        'GREATERTHAN': f"Operador '>' inesperado. Puede que falte un operando",
+        'LEQ': f"Operador '<=' inesperado. Puede que falte un operando",
+        'GEQ': f"Operador '>=' inesperado. Puede que falte un operando",
+        'AND': f"Operador 'and' inesperado. Puede que falte un operando",
+        'OR': f"Operador 'or' inesperado. Puede que falte un operando",
+        'NOT': f"Operador 'not' inesperado",
+        'FROM': f"Palabra clave 'from' inesperada. Verifique la sintaxis de importación o selección",
+        'WHERE': f"Palabra clave 'where' inesperada. Verifique la condición",
+        'GIVEN': f"Palabra clave 'given' inesperada. Verifique la sintaxis de probabilidad condicional",
     }
     
     if token_type in specific_messages:
@@ -422,6 +580,42 @@ def make_parser():
     parser.errors = []
     return parser
 
+# ==================== FUNCIÓN DE PARSING ====================
+
+def parse(text: str, debug=False) -> Dict[str, Any]:
+    """
+    Parsea el texto y devuelve el AST y errores.
+    
+    Returns:
+        Dict con:
+        - 'ast': Árbol de sintaxis abstracta
+        - 'errors': Lista de errores sintácticos
+        - 'success': Boolean indicando éxito
+    """
+    lexer_instance = make_lexer()
+    lexer_instance.errors = []
+    parser_instance = make_parser()
+    parser_instance.errors = []
+    
+    try:
+        ast = parser_instance.parse(text, lexer=lexer_instance, debug=debug)
+        
+        return {
+            'ast': ast,
+            'errors': parser_instance.errors,
+            'success': len(parser_instance.errors) == 0
+        }
+    except Exception as e:
+        return {
+            'ast': None,
+            'errors': parser_instance.errors + lexer_instance.errors + [{
+                'type': 'critical_error',
+                'code': 'SYN-ERROR',
+                'category': 'Error crítico',
+                'message': f"Error crítico: {str(e)}"
+            }],
+            'success': False
+        }
 # ==================== FUNCIÓN DE PARSING ====================
 
 def parse(text: str, debug=False) -> Dict[str, Any]:
@@ -482,7 +676,7 @@ def print_ast(node, indent=0):
         print(f"{prefix}{node}")
 
 def format_syntax_errors(errors: List[Dict], source_text: str = "") -> str:
-    """Formatea errores sintácticos para mostrar en consola, similar al formato léxico"""
+    """Formatea errores sintácticos para mostrar en consola con códigos de error"""
     if not errors:
         return ""
     
@@ -490,17 +684,19 @@ def format_syntax_errors(errors: List[Dict], source_text: str = "") -> str:
     source_lines = source_text.splitlines() if source_text else []
     
     for error in errors:
+        code = error.get('code', 'SYN-???')
+        category = error.get('category', 'Error sintáctico')
         line_num = error.get('line')
         col_num = error.get('column', 1)
-        token_type = error.get('token', '?')
-        token_value = error.get('value', '')
         message = error.get('message', 'Error desconocido')
         
         if line_num == 'EOF':
-            lines.append(f"Error sintáctico al final del archivo: {message}")
+            lines.append(f"[{code}] {category}")
+            lines.append(f"  Final del archivo: {message}")
         else:
-            # Formato similar al léxico
-            lines.append(f"Error sintáctico en línea {line_num}, columna {col_num}: {message}")
+            # Formato con código de error
+            lines.append(f"[{code}] {category}")
+            lines.append(f"  Línea {line_num}, Columna {col_num}: {message}")
             
             # Mostrar la línea de código si está disponible
             if source_lines and isinstance(line_num, int) and 0 < line_num <= len(source_lines):
@@ -509,11 +705,13 @@ def format_syntax_errors(errors: List[Dict], source_text: str = "") -> str:
                 # Indicador de posición
                 if isinstance(col_num, int) and col_num > 0:
                     lines.append(f"  {' ' * (col_num - 1)}^")
-            
-            # Sugerencia basada en el tipo de error
-            if token_value:
-                lines.append(f"  Token problemático: '{token_value}' (tipo: {token_type})")
         
         lines.append("")  # Línea en blanco entre errores
     
     return "\n".join(lines)
+
+def print_syntax_errors(errors: List[Dict[str, Any]], source_text: str = ""):
+    """Imprime los errores sintácticos de manera formateada para debugging"""
+    formatted = format_syntax_errors(errors, source_text)
+    if formatted:
+        print(formatted)
