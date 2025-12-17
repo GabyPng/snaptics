@@ -18,6 +18,51 @@ import difflib
    QSyntaxHighlighter Para resaltar Tokens o errores     
 """
 
+# ============================================================================
+# CÓDIGOS Y CATEGORÍAS DE ERRORES LÉXICOS
+# ============================================================================
+
+class LexicalErrorCode:
+    """Códigos de error léxico del compilador snaptics"""
+    
+    # Errores de caracteres especiales (LEX-100)
+    SPANISH_PUNCTUATION = ("LEX-101", "Signo de puntuación español no permitido")
+    AT_SYMBOL = ("LEX-102", "Símbolo '@' no válido")
+    DOLLAR_SYMBOL = ("LEX-103", "Símbolo '$' no permitido")
+    PERCENT_SYMBOL = ("LEX-104", "Símbolo '%' no válido")
+    
+    # Errores de delimitadores (LEX-200)
+    SQUARE_BRACKETS = ("LEX-201", "Corchetes no soportados")
+    CURLY_BRACES = ("LEX-202", "Llaves no soportadas")
+    
+    # Errores de operadores (LEX-300)
+    PIPE_OPERATOR = ("LEX-301", "Operador '|' no válido")
+    DOUBLE_PIPE = ("LEX-302", "Operador '||' no válido")
+    AMPERSAND_OPERATOR = ("LEX-303", "Operador '&' no válido")
+    DOUBLE_AMPERSAND = ("LEX-304", "Operador '&&' no válido")
+    INCOMPLETE_NOT = ("LEX-305", "Operador '!' incompleto")
+    
+    # Errores de sintaxis (LEX-400)
+    SEMICOLON = ("LEX-401", "Punto y coma innecesario")
+    BACKSLASH = ("LEX-402", "Barra invertida fuera de contexto")
+    
+    # Errores de caracteres (LEX-500)
+    ACCENTED_CHAR = ("LEX-501", "Carácter acentuado no válido")
+    UNICODE_CHAR = ("LEX-502", "Carácter Unicode no permitido")
+    BACKTICK_TILDE = ("LEX-503", "Carácter no válido")
+    
+    # Errores de cadenas y comentarios (LEX-600)
+    UNCLOSED_STRING = ("LEX-601", "Cadena sin cerrar")
+    STRING_ERROR = ("LEX-602", "Error en cadena de texto")
+    UNCLOSED_BLOCK_COMMENT = ("LEX-603", "Comentario de bloque sin cerrar")
+    BLOCK_COMMENT_ERROR = ("LEX-604", "Error en comentario de bloque")
+    
+    # Errores de palabras reservadas (LEX-700)
+    RESERVED_TYPO = ("LEX-701", "Error de escritura en palabra reservada")
+    
+    # Error genérico (LEX-999)
+    ILLEGAL_CHAR = ("LEX-999", "Carácter ilegal")
+
 
 reserved = {
     # Estructura de datos y análisis
@@ -139,8 +184,11 @@ def t_ID(t):
         cutoff = 0.85 if len(t.value) > 3 else 0.75
         suggestions = difflib.get_close_matches(t.value.lower(), reserved_words, n=1, cutoff=cutoff)
         if suggestions:
+            code, category = LexicalErrorCode.RESERVED_TYPO
             error = {
                 'type': 'lexical',
+                'code': code,
+                'category': category,
                 'line': t.lineno,
                 'column': find_column(t.lexer.lexdata, t),
                 'line_text': t.lexer.lexdata.splitlines()[t.lineno - 1] if t.lineno - 1 < len(t.lexer.lexdata.splitlines()) else "",
@@ -165,12 +213,7 @@ def t_STRING(t):
     return t
 
 
-# def t_BOOL(t):
-#     r'(true|false)'
-#     t.value = True if t.value == 'true' else False
-#     return t
-
-# Cuenta las líenas para trackearlas
+# Cuenta las líneas para trackearlas
 def t_newline(t):
     r'\n+'
     t.lexer.lineno += len(t.value)
@@ -193,49 +236,61 @@ def categorize_char_error(char, line_text, column):
         column: Posición de la columna
     
     Returns:
-        String con el mensaje de error categorizado
+        Tupla (code, category, message) con el código, categoría y mensaje de error
     """
     # Signos de puntuación español
     if char in '¿¡':
-        return f"Signo de puntuación español no permitido '{char}'"
+        code, category = LexicalErrorCode.SPANISH_PUNCTUATION
+        return (code, category, f"Signo de puntuación español no permitido '{char}'")
     
     # Símbolos especiales comunes
     elif char == '@':
-        return f"Símbolo '@' no válido (solo permitido dentro de cadenas)"
+        code, category = LexicalErrorCode.AT_SYMBOL
+        return (code, category, f"Símbolo '@' no válido (solo permitido dentro de cadenas)")
     
     elif char == '$':
-        return f"Símbolo '$' no permitido (use el nombre de la moneda o cadenas)"
+        code, category = LexicalErrorCode.DOLLAR_SYMBOL
+        return (code, category, f"Símbolo '$' no permitido (use el nombre de la moneda o cadenas)")
     
     elif char == '%':
-        return f"Símbolo '%' no es un operador válido"
+        code, category = LexicalErrorCode.PERCENT_SYMBOL
+        return (code, category, f"Símbolo '%' no es un operador válido")
     
     # Delimitadores no soportados
     elif char in '[]':
-        return f"Corchetes '{char}' no están soportados (use paréntesis)"
+        code, category = LexicalErrorCode.SQUARE_BRACKETS
+        return (code, category, f"Corchetes '{char}' no están soportados (use paréntesis)")
     
     elif char in '{}':
-        return f"Llaves '{char}' no están soportadas (use paréntesis para agrupar)"
+        code, category = LexicalErrorCode.CURLY_BRACES
+        return (code, category, f"Llaves '{char}' no están soportadas (use paréntesis para agrupar)")
     
     # Operadores lógicos incorrectos
     elif char == '|':
-        return f"Operador '|' no válido (use 'or' para operaciones lógicas)"
+        code, category = LexicalErrorCode.PIPE_OPERATOR
+        return (code, category, f"Operador '|' no válido (use 'or' para operaciones lógicas)")
     
     elif char == '||':
-        return f"Operador '||' no válido (use 'or' para operaciones lógicas)"
+        code, category = LexicalErrorCode.DOUBLE_PIPE
+        return (code, category, f"Operador '||' no válido (use 'or' para operaciones lógicas)")
     
     elif char == '&':
-        return f"Operador '&' no válido (use 'and' para operaciones lógicas)"
+        code, category = LexicalErrorCode.AMPERSAND_OPERATOR
+        return (code, category, f"Operador '&' no válido (use 'and' para operaciones lógicas)")
     
     elif char == '&&':
-        return f"Operador '&&' no válido (use 'and' para operaciones lógicas)"
+        code, category = LexicalErrorCode.DOUBLE_AMPERSAND
+        return (code, category, f"Operador '&&' no válido (use 'and' para operaciones lógicas)")
     
     # Punto y coma innecesario
     elif char == ';':
-        return f"Punto y coma ';' no es necesario (no se requieren terminadores de línea)"
+        code, category = LexicalErrorCode.SEMICOLON
+        return (code, category, f"Punto y coma ';' no es necesario (no se requieren terminadores de línea)")
     
     # Barra invertida fuera de cadena
     elif char == '\\':
-        return f"Barra invertida '\\' solo válida dentro de cadenas"
+        code, category = LexicalErrorCode.BACKSLASH
+        return (code, category, f"Barra invertida '\\' solo válida dentro de cadenas")
     
     # Caracteres con acento
     elif char in 'áéíóúÁÉÍÓÚñÑ':
@@ -243,33 +298,35 @@ def categorize_char_error(char, line_text, column):
                 'Á':'A', 'É':'E', 'Í':'I', 'Ó':'O', 'Ú':'U',
                 'ñ':'n', 'Ñ':'N'}
         replacement = base.get(char, char)
-        return f"Carácter acentuado '{char}' no válido (use '{replacement}' sin acento)"
+        code, category = LexicalErrorCode.ACCENTED_CHAR
+        return (code, category, f"Carácter acentuado '{char}' no válido (use '{replacement}' sin acento)")
     
     # Otros caracteres Unicode
     elif ord(char) > 127:
-        return f"Carácter Unicode '{char}' no permitido (código: {ord(char)})"
-    
-    # Caracteres de control
-    elif ord(char) < 32 and char not in '\n\t\r':
-        return f"Carácter de control no válido (código ASCII: {ord(char)})"
+        code, category = LexicalErrorCode.UNICODE_CHAR
+        return (code, category, f"Carácter Unicode '{char}' no permitido (código: {ord(char)})")
     
     # Backticks y tildes
     elif char in '`~':
-        return f"Carácter '{char}' no es válido en este lenguaje"
+        code, category = LexicalErrorCode.BACKTICK_TILDE
+        return (code, category, f"Carácter '{char}' no es válido en este lenguaje")
     
     # Carácter por defecto
     else:
-        return f"Carácter ilegal '{char}'"
+        code, category = LexicalErrorCode.ILLEGAL_CHAR
+        return (code, category, f"Carácter ilegal '{char}'")
 
 
 def t_error(t):
-    """Maneja errores léxicos con categorización detallada."""
+    """Maneja errores léxicos con categorización detallada y códigos."""
     line = t.lexer.lineno
     column = find_column(t.lexer.lexdata, t)
     lines = t.lexer.lexdata.splitlines()
     line_text = lines[line - 1] if line - 1 < len(lines) else ""
     
     char = t.value[0]
+    code = None
+    category = None
     message = None
     
     # Caso especial 1: Cadena no cerrada
@@ -277,27 +334,32 @@ def t_error(t):
         rest_of_line = line_text[column - 1:]
         # Si solo hay una comilla en lo que resta de línea, probablemente no está cerrada
         if rest_of_line.count('"') == 1:
+            code, category = LexicalErrorCode.UNCLOSED_STRING
             message = "Cadena no cerrada (falta comilla de cierre)"
         else:
+            code, category = LexicalErrorCode.STRING_ERROR
             message = "Error en cadena de texto (verifique las comillas)"
     
     # Caso especial 2: Comentario de bloque no cerrado
     elif t.value.startswith('/*'):
         rest_of_text = t.lexer.lexdata[t.lexpos:]
         if '*/' not in rest_of_text:
+            code, category = LexicalErrorCode.UNCLOSED_BLOCK_COMMENT
             message = "Comentario de bloque sin cierre (falta */)"
         else:
+            code, category = LexicalErrorCode.BLOCK_COMMENT_ERROR
             message = "Error en comentario de bloque"
     
     # Caso especial 3: Operador '!' incompleto
     elif char == '!' and column < len(line_text):
         next_char = line_text[column] if column < len(line_text) else ''
         if next_char != '=':
+            code, category = LexicalErrorCode.INCOMPLETE_NOT
             message = "Operador '!' incompleto (use '!=' para desigualdad o 'not' para negación)"
     
     # Categorización por carácter
     if not message:
-        message = categorize_char_error(char, line_text, column)
+        code, category, message = categorize_char_error(char, line_text, column)
     
     # Sugerir palabra reservada similar
     reserved_words = list(reserved.keys())
@@ -308,6 +370,8 @@ def t_error(t):
     
     error = {
         'type': 'lexical',
+        'code': code,
+        'category': category,
         'line': line,
         'column': column,
         'line_text': line_text,
@@ -359,12 +423,13 @@ def tokenize(text: str) -> Dict[str, Any]:
 
 def print_errors(errors: List[Dict[str, Any]]):
     """
-    Imprime los errores de manera formateada con línea, columna, texto y flecha.
-    Esto sirve para ver la salida del lexer directamente, descomentando el código de main y en 
-    code poner el código directamente. Sirve para debuggear
+    Imprime los errores de manera formateada con código, línea, columna, texto y flecha.
     """
     for error in errors:
-        print(f"Error léxico en línea {error['line']}, columna {error['column']}: {error['message']}")
+        code = error.get('code', 'LEX-???')
+        category = error.get('category', 'Error léxico')
+        print(f"[{code}] {category}")
+        print(f"  Línea {error['line']}, Columna {error['column']}: {error['message']}")
         print(f"  {error['line_text']}")
         print(f"  {' ' * (error['column'] - 1)}^")
 
@@ -374,7 +439,10 @@ def format_errors(errors: List[Dict[str, Any]]) -> str:
         return ""
     lines = []
     for error in errors:
-        lines.append(f"Error léxico en línea {error['line']}, columna {error['column']}: {error['message']}")
+        code = error.get('code', 'LEX-???')
+        category = error.get('category', 'Error léxico')
+        lines.append(f"[{code}] {category}")
+        lines.append(f"  Línea {error['line']}, Columna {error['column']}: {error['message']}")
         lines.append(f"  {error['line_text']}")
         lines.append(f"  {' ' * (error['column'] - 1)}^")
         lines.append("")  # blank line between errors
