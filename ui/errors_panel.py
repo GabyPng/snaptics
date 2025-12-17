@@ -209,7 +209,7 @@ class ErrorsPanel(QtWidgets.QDialog):
 				'descripcion': 'Carácter general no reconocido por el analizador léxico',
 				'ejemplo': '',
                 'solucion': 'Reemplazar o eliminar el carácter ilegal'
-            }
+            },
 
 			# ========= Errores de declaraciones =========
 			
@@ -421,7 +421,7 @@ class ErrorsPanel(QtWidgets.QDialog):
 				'id': 'SYN-703',
                 'nombre': 'Operador lógico inválido',
 				'descripcion': 'El operador lógico no es correcto',
-				'ejemplo': 'Uso incorrecto de and/or/not,
+				'ejemplo': 'Uso incorrecto de and/or/not',
                 'solucion': 'Verificar la sintaxis lógica'
             },
 
