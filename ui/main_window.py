@@ -346,7 +346,10 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
             
             # Ejecutar análisis sintáctico
             parse_result = syntax_parser.parse(text)
-            syntactic_errors = parse_result['errors']
+            syntactic_errors = [
+                err for err in parse_result.get('errors', [])
+                if err.get('type') == 'syntax_error' or err.get('code', '').startswith('SYN-')
+            ]
             has_syntactic_errors = len(syntactic_errors) > 0
             
             # Mostrar solo los errores
@@ -368,6 +371,8 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
                     lines.append(syntactic_error_output)
                 
                 self._print_to_terminal("\n".join(lines))
+
+                self.last_ast = None
                 
                 # Mostrar mensaje de error
                 total_errors = len(lexical_errors) + len(syntactic_errors)

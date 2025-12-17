@@ -55,6 +55,10 @@ class LexicalErrorCode:
     UNCLOSED_BLOCK_COMMENT = ("LEX-603", "Comentario de bloque sin cerrar")
     BLOCK_COMMENT_ERROR = ("LEX-604", "Error en comentario de bloque")
     
+    # Errores de números (LEX-650) - NUEVA CATEGORÍA
+    MALFORMED_NUMBER = ("LEX-651", "Número malformado")
+    MULTIPLE_DECIMALS = ("LEX-652", "Número con múltiples puntos decimales")
+    
     # Errores de palabras reservadas (LEX-700)
     RESERVED_TYPO = ("LEX-701", "Error de escritura en palabra reservada")
     
@@ -106,7 +110,6 @@ reserved = {
     'false': 'FALSE',
 }
 
-
 tokens = [
     'ID',
     
@@ -127,7 +130,7 @@ tokens = [
     'GEQ',
     
     'ASIG', # =
-    'COND', # :=
+    'COND', # :-
     'RANGE', # ..
     'COMMA', # ,
     'DOT', # .
@@ -138,7 +141,7 @@ tokens = [
     
 ] + list(reserved.values())
 
-t_ignore  = ' \t'
+t_ignore = ' \t'
 
 def t_COMMENT(t):
     r'\#.*'
@@ -149,7 +152,6 @@ def t_COMENTARIO_BLOQUE(t):
     r'/\*([^*]|\*+[^*/])*\*/'
     t.lexer.lineno += t.value.count('\n')
     pass
-
 
 t_LPAREN = r'\('
 t_RPAREN = r'\)'
@@ -171,6 +173,29 @@ t_COND = r':-'
 t_RANGE = r'\.\.'
 t_COMMA = r','
 t_DOT = r'\.'
+
+# IMPORTANTE: Esta función DEBE ir ANTES de t_REAL y t_INT
+# para que detect_malformed_number tenga prioridad
+def t_MALFORMED_NUMBER(t):
+    r'\d+(\.\d+){2,}'
+    """Detecta números con múltiples puntos decimales como 0.60.0"""
+    code, category = LexicalErrorCode.MULTIPLE_DECIMALS
+    line = t.lineno
+    column = find_column(t.lexer.lexdata, t)
+    line_text = t.lexer.lexdata.splitlines()[line - 1] if line - 1 < len(t.lexer.lexdata.splitlines()) else ""
+    
+    error = {
+        'type': 'lexical',
+        'code': code,
+        'category': category,
+        'line': line,
+        'column': column,
+        'line_text': line_text,
+        'message': f"Número con múltiples puntos decimales: '{t.value}'. Los números decimales solo pueden tener un punto."
+    }
+    t.lexer.errors.append(error)
+    # No retornar token, solo registrar error y continuar
+    return None
 
 def t_ID(t):
     r'[A-Za-z_][A-Za-z_0-9.]*'
@@ -197,8 +222,26 @@ def t_ID(t):
 
 def t_REAL(t):
     r'\d+\.\d+([eE][-+]?\d+)?'
-    t.value = float(t.value)
-    return t
+    try:
+        t.value = float(t.value)
+        return t
+    except ValueError:
+        code, category = LexicalErrorCode.MALFORMED_NUMBER
+        line = t.lineno
+        column = find_column(t.lexer.lexdata, t)
+        line_text = t.lexer.lexdata.splitlines()[line - 1] if line - 1 < len(t.lexer.lexdata.splitlines()) else ""
+        
+        error = {
+            'type': 'lexical',
+            'code': code,
+            'category': category,
+            'line': line,
+            'column': column,
+            'line_text': line_text,
+            'message': f"Número real malformado: '{t.value}'"
+        }
+        t.lexer.errors.append(error)
+        return None
 
 def t_INT(t):
     r'\d+'
@@ -222,7 +265,6 @@ def t_newline(t):
 def find_column(input, token):
     line_start = input.rfind('\n', 0, token.lexpos) + 1
     return (token.lexpos - line_start) + 1
-
 
 def categorize_char_error(char, line_text, column):
     """
@@ -306,9 +348,60 @@ def categorize_char_error(char, line_text, column):
         code, category = LexicalErrorCode.ILLEGAL_CHAR
         return (code, category, f"Carácter ilegal '{char}'")
 
+def detect_malformed_number(t):
+    """
+    Detecta números malformados como 0.60.0 (múltiples puntos decimales).
+    
+    Returns:
+        True si se detectó y manejó un error, False en caso contrario
+    """
+    # Buscar patrones de números con múltiples puntos
+    # Ejemplo: 0.60.0, 3.14.159, etc.
+    import re
+    
+    line = t.lineno
+    column = find_column(t.lexer.lexdata, t)
+    lines = t.lexer.lexdata.splitlines()
+    line_text = lines[line - 1] if line - 1 < len(lines) else ""
+    
+    # Obtener el resto de la línea desde la posición actual
+    pos_in_line = column - 1
+    rest_of_line = line_text[pos_in_line:]
+    
+    # Regex para detectar número con múltiples puntos decimales
+    # Captura patrones como: 0.60.0, 123.45.67, etc.
+    malformed_pattern = r'^(\d+\.\d+)(\.\d+)+'
+    match = re.match(malformed_pattern, rest_of_line)
+    
+    if match:
+        malformed_number = match.group(0)
+        code, category = LexicalErrorCode.MULTIPLE_DECIMALS
+        
+        error = {
+            'type': 'lexical',
+            'code': code,
+            'category': category,
+            'line': line,
+            'column': column,
+            'line_text': line_text,
+            'message': f"Número con múltiples puntos decimales: '{malformed_number}'. Los números decimales solo pueden tener un punto."
+        }
+        t.lexer.errors.append(error)
+        
+        # Saltar todo el número malformado
+        t.lexer.skip(len(malformed_number))
+        return True
+    
+    return False
 
 def t_error(t):
     """Maneja errores léxicos con categorización detallada y códigos."""
+    
+    # PRIMERO: Verificar si es un número malformado
+    if t.value[0].isdigit():
+        if detect_malformed_number(t):
+            return  # Ya se manejó el error
+    
     line = t.lexer.lineno
     column = find_column(t.lexer.lexdata, t)
     lines = t.lexer.lexdata.splitlines()
@@ -379,6 +472,12 @@ def make_lexer():
     )
 
 def tokenize(text: str) -> Dict[str, Any]:
+    """
+    Tokeniza el texto y retorna tokens y errores.
+    
+    Returns:
+        Dict con 'tokens', 'errors' y 'output'
+    """
     lexer = make_lexer()
     lexer.errors = []
     lexer.input(text)
@@ -410,7 +509,6 @@ def tokenize(text: str) -> Dict[str, Any]:
         'output': ""  
     }
 
-
 def print_errors(errors: List[Dict[str, Any]]):
     """
     Imprime los errores de manera formateada con código, línea, columna, texto y flecha.
@@ -435,7 +533,7 @@ def format_errors(errors: List[Dict[str, Any]]) -> str:
         lines.append(f"  Línea {error['line']}, Columna {error['column']}: {error['message']}")
         lines.append(f"  {error['line_text']}")
         lines.append(f"  {' ' * (error['column'] - 1)}^")
-        lines.append("")  # blank line between errors
+        lines.append("")
     return "\n".join(lines)
 
 if __name__ == '__main__':
