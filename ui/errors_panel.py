@@ -37,28 +37,28 @@ class ErrorsPanel(QtWidgets.QDialog):
 		errors = [
 			# ========= Errores lexicos =========
             {
-				'id': 'LEX-001',
+				'id': 'LEX-101',
 				'nombre': 'Signo de puntuacion inicial',
 				'descripcion': 'Uso signos de interrogacion o exclamacion de apertura',
 				'ejemplo': '¿pregunta? o ¡valor!',
 				'solucion': 'Eliminar los signos de apertura'
 			},
 			{
-				'id': 'LEX-002',
+				'id': 'LEX-102',
 				'nombre': 'Símbolo arroba',
 				'descripcion': 'El símbolo @ solo es válido dentro de cadenas',
 				'ejemplo': 'promedi@_bajo',
 				'solucion': 'Reemplazar o eliminar el símbolo @'
             },
 			{
-				'id': 'LEX-003',
+				'id': 'LEX-103',
 				'nombre': 'Símbolo de moneda',
 				'descripcion': 'El símbolo $ es inválido',
 				'ejemplo': 'promedio$',
 				'solucion': 'Reemplazar o eliminar el símbolo $'
             },
 			{
-				'id': 'LEX-004',
+				'id': 'LEX-104',
 				'nombre': 'Símbolo porcentaje',
 				'descripcion': 'El símbolo % es inválido',
 				'ejemplo': 'promedio%',
@@ -68,14 +68,14 @@ class ErrorsPanel(QtWidgets.QDialog):
             # ========= Errores de delimitadores =========
 
 			{
-				'id': 'LEX-101',
+				'id': 'LEX-201',
                 'nombre': 'Corchetes',
 				'descripcion': 'Los delimitadores [] son inválidos',
 				'ejemplo': 'array[0]',
                 'solucion': 'Usar delimitadores ()'
             },
 			{
-				'id': 'LEX-102',
+				'id': 'LEX-202',
                 'nombre': 'Llaves',
 				'descripcion': 'Los delimitadores {} son inválidos',
 				'ejemplo': '{x, y, z}',
@@ -85,35 +85,35 @@ class ErrorsPanel(QtWidgets.QDialog):
             # ========= Errores de operadores =========
 			
 			{
-				'id': 'LEX-201',
+				'id': 'LEX-301',
                 'nombre': 'Operador pipe',
 				'descripcion': 'El operador | es inválido',
 				'ejemplo': 'this | that',
                 'solucion': 'Eliminar operador inválido'
             },
 			{
-				'id': 'LEX-202',
+				'id': 'LEX-302',
                 'nombre': 'Operador doble pipe',
 				'descripcion': 'El operador || es inválido',
 				'ejemplo': 'this || that',
                 'solucion': 'Eliminar operador inválido'
             },
             {
-				'id': 'LEX-203',
+				'id': 'LEX-303',
                 'nombre': 'Operador ampersand',
 				'descripcion': 'El operador & es inválido',
 				'ejemplo': 'this & that',
                 'solucion': 'Eliminar operador inválido'
             },
 			{
-				'id': 'LEX-204',
+				'id': 'LEX-304',
                 'nombre': 'Operador doble ampersand',
 				'descripcion': 'El operador && es inválido',
 				'ejemplo': 'this && that',
                 'solucion': 'Eliminar operador inválido'
             },
 			{
-				'id': 'LEX-205',
+				'id': 'LEX-305',
                 'nombre': 'Operador negación',
 				'descripcion': 'El operador ! por si solo es inválido',
 				'ejemplo': '!this',
@@ -123,14 +123,14 @@ class ErrorsPanel(QtWidgets.QDialog):
             # ========= Errores de sintaxis =========
 
 			{
-				'id': 'LEX-301',
+				'id': 'LEX-401',
                 'nombre': 'Símbolo semicolon',
 				'descripcion': 'El símbolo ; es innecesario para fin de línea',
 				'ejemplo': 'fact x = 10;',
                 'solucion': 'Eliminar símbolo innecesario'
             },
 			{
-				'id': 'LEX-302',
+				'id': 'LEX-402',
                 'nombre': 'Símbolo barra invertida',
 				'descripcion': 'El símbolo \\ solo es válido dentro de cadenas',
 				'ejemplo': 'path \\ to \\ file',
@@ -140,21 +140,21 @@ class ErrorsPanel(QtWidgets.QDialog):
             # ========= Errores de caracteres =========
             
             {
-				'id': 'LEX-401',
+				'id': 'LEX-501',
                 'nombre': 'Símbolo acentuado',
 				'descripcion': 'Los símbolos acentuados son inválidos',
 				'ejemplo': 'análisis',
                 'solucion': 'Reemplazar o eliminar símbolos acentuados'
             },
 			{
-				'id': 'LEX-402',
+				'id': 'LEX-502',
                 'nombre': 'Unicode inválido',
 				'descripcion': 'Caracteres unicode fuera del rango ASCII',
 				'ejemplo': '小红书',
                 'solucion': 'Eliminar caracteres unicode inválidos'
             },
 			{
-				'id': 'LEX-403',
+				'id': 'LEX-503',
                 'nombre': 'Cáracter inválido',
 				'descripcion': 'Caracteres como backtick o tilde son inválidos',
 				'ejemplo': 'variable` o value~',
@@ -163,28 +163,28 @@ class ErrorsPanel(QtWidgets.QDialog):
 			
             # ========= Errores de cadenas y comentarios =========
 			{
-				'id': 'LEX-501',
+				'id': 'LEX-601',
                 'nombre': 'Cadena de texto sin cerrar',
 				'descripcion': 'Falta de comillas de cierre',
 				'ejemplo': '"texto sin cerrar...',
                 'solucion': 'Agregar comillas de cierre'
             },
 			{
-				'id': 'LEX-502',
+				'id': 'LEX-602',
                 'nombre': 'Error en cadena de texto',
 				'descripcion': 'Error general en el formato de la cadena de texto',
 				'ejemplo': '"error"en texto"',
                 'solucion': 'Verficiar y corregir el formato de la cadena'
             },
 			{
-				'id': 'LEX-503',
+				'id': 'LEX-603',
                 'nombre': 'Comentario sin cerrar',
 				'descripcion': 'Falta de cierre en un comentario',
 				'ejemplo': '/* comentario sin cerrar...',
                 'solucion': 'Agregar cierre */ al comentario'
             },
 			{
-				'id': 'LEX-504',
+				'id': 'LEX-604',
                 'nombre': 'Error en comentario',
 				'descripcion': 'Error general en el formato del comentario',
 				'ejemplo': '/* comentario */ erroneo */',
@@ -194,7 +194,7 @@ class ErrorsPanel(QtWidgets.QDialog):
             # ========= Errores de palabras reservadas =========
 			
             {
-				'id': 'LEX-601',
+				'id': 'LEX-701',
                 'nombre': 'Palabra reservada erronea',
 				'descripcion': 'Error tipográfico en palabra reservada',
 				'ejemplo': 'fakt',
@@ -203,7 +203,7 @@ class ErrorsPanel(QtWidgets.QDialog):
 			
             # ========= Error general =========
             {
-				'id': 'LEX-701',
+				'id': 'LEX-801',
                 'nombre': 'Carácter ilegal',
 				'descripcion': 'Carácter general no reconocido por el analizador léxico',
 				'ejemplo': '',
