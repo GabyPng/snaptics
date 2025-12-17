@@ -188,6 +188,9 @@ class Ui_snaptics(object):
         # Acción de ayuda
         self.actionAbout = QtGui.QAction(parent=snaptics)
         self.actionAbout.setObjectName("actionAbout")
+        # Acción para mostrar errores
+        self.actionErrors = QtGui.QAction(parent=snaptics)
+        self.actionErrors.setObjectName("actionErrors")
     
     def _connect_menu_actions(self):
         """Conectar acciones a los menús"""
@@ -220,6 +223,7 @@ class Ui_snaptics(object):
         self.menuTerminal.addAction(self.actionNew_Terminal)
         
         # Menú Ayuda
+        self.menuHelp.addAction(self.actionErrors)
         self.menuHelp.addAction(self.actionAbout)
         
         # Agregar menús a la barra
@@ -290,6 +294,7 @@ class Ui_snaptics(object):
         # Acciones de ayuda
         self.actionAbout.setText(_translate("snaptics", "About"))
         self.actionAbout.setShortcut(_translate("snaptics", "Ctrl+H"))
+        self.actionErrors.setText(_translate("snaptics", "Errors"))
         
         # Acciones de terminal
         self.actionNew_Terminal.setText(_translate("snaptics", "Terminal"))

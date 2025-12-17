@@ -13,6 +13,7 @@ from .tokens_panel import TokensPanel
 from .terminal_controller import TerminalController
 from .file_manager import FileManager
 from .theme_manager import ThemeManager
+from .errors_panel import ErrorsPanel
 
 
 
@@ -255,6 +256,20 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
 
         # Señal de ayuda
         self.ui.actionAbout.triggered.connect(self._show_about)
+        
+        # Help -> Errors
+        try:
+            self.ui.actionErrors.triggered.connect(self._show_errors_panel)
+        except Exception:
+            pass
+
+    def _show_errors_panel(self):
+        """Abrir el diálogo con la tabla de errores."""
+        try:
+            dlg = ErrorsPanel(self)
+            dlg.exec()
+        except Exception as e:
+            self._print_to_terminal(f"[Errors] No se pudo abrir el panel de errores: {e}")
     
     def _setup_initial_state(self):
         """Configurar el estado inicial de la aplicación"""
