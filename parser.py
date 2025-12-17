@@ -22,50 +22,31 @@ class SyntaxErrorCode:
     # Errores de expresiones (SYN-200 series)
     MISSING_OPERAND = ("SYN-201", "Falta operando en expresión")
     INVALID_EXPRESSION = ("SYN-202", "Expresión inválida")
-    MISSING_OPERATOR = ("SYN-203", "Falta operador")
     UNEXPECTED_TOKEN = ("SYN-204", "Token inesperado en expresión")
     
     # Errores de paréntesis y delimitadores (SYN-300 series)
-    MISSING_LPAREN = ("SYN-301", "Falta paréntesis de apertura")
     MISSING_RPAREN = ("SYN-302", "Falta paréntesis de cierre")
     UNMATCHED_PAREN = ("SYN-303", "Paréntesis sin correspondencia")
-    MISSING_COMMA = ("SYN-304", "Falta coma en lista")
     UNEXPECTED_COMMA = ("SYN-305", "Coma inesperada")
     
     # Errores de cláusulas (SYN-400 series)
     MISSING_FROM = ("SYN-401", "Falta cláusula FROM")
     MISSING_WHERE = ("SYN-402", "Condición WHERE incompleta")
-    INVALID_SELECT = ("SYN-403", "Cláusula SELECT inválida")
     MISSING_GIVEN = ("SYN-404", "Falta cláusula GIVEN en probabilidad condicional")
     
     # Errores de identificadores (SYN-500 series)
     MISSING_IDENTIFIER = ("SYN-501", "Falta identificador")
     INVALID_IDENTIFIER = ("SYN-502", "Identificador inválido")
-    DUPLICATE_IDENTIFIER = ("SYN-503", "Identificador duplicado")
     
     # Errores de valores y literales (SYN-600 series)
-    MISSING_VALUE = ("SYN-601", "Falta valor")
     INVALID_NUMBER = ("SYN-602", "Número inválido")
     INVALID_STRING = ("SYN-603", "Cadena inválida")
-    MISSING_STRING = ("SYN-604", "Falta cadena de texto")
-    
-    # Errores de operadores (SYN-700 series)
-    INVALID_OPERATOR = ("SYN-701", "Operador inválido")
-    MISSING_RELATIONAL_OP = ("SYN-702", "Falta operador relacional")
-    INVALID_LOGICAL_OP = ("SYN-703", "Operador lógico inválido")
     
     # Errores de probabilidad (SYN-800 series)
     INVALID_PROBABILITY = ("SYN-801", "Expresión de probabilidad inválida")
-    MISSING_PROB_CONDITION = ("SYN-802", "Falta condición en probabilidad")
-    INVALID_PROB_SYNTAX = ("SYN-803", "Sintaxis de probabilidad incorrecta")
     
     # Errores de estructura (SYN-900 series)
     UNEXPECTED_EOF = ("SYN-901", "Final inesperado del archivo")
-    INCOMPLETE_STATEMENT = ("SYN-902", "Declaración incompleta")
-    INVALID_SYNTAX = ("SYN-903", "Sintaxis inválida")
-    
-    # Error genérico (SYN-999)
-    GENERIC_ERROR = ("SYN-999", "Error sintáctico")
 
 # ==================== PRECEDENCIA Y ASOCIATIVIDAD ====================
 precedence = (
@@ -612,40 +593,6 @@ def parse(text: str, debug=False) -> Dict[str, Any]:
                 'type': 'critical_error',
                 'code': 'SYN-ERROR',
                 'category': 'Error crítico',
-                'message': f"Error crítico: {str(e)}"
-            }],
-            'success': False
-        }
-# ==================== FUNCIÓN DE PARSING ====================
-
-def parse(text: str, debug=False) -> Dict[str, Any]:
-    """
-    Parsea el texto y devuelve el AST y errores.
-    
-    Returns:
-        Dict con:
-        - 'ast': Árbol de sintaxis abstracta
-        - 'errors': Lista de errores sintácticos
-        - 'success': Boolean indicando éxito
-    """
-    lexer_instance = make_lexer()
-    lexer_instance.errors = []
-    parser_instance = make_parser()
-    parser_instance.errors = []
-    
-    try:
-        ast = parser_instance.parse(text, lexer=lexer_instance, debug=debug)
-        
-        return {
-            'ast': ast,
-            'errors': parser_instance.errors,
-            'success': len(parser_instance.errors) == 0
-        }
-    except Exception as e:
-        return {
-            'ast': None,
-            'errors': parser_instance.errors + lexer_instance.errors + [{
-                'type': 'critical_error',
                 'message': f"Error crítico: {str(e)}"
             }],
             'success': False

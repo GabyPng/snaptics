@@ -37,9 +37,7 @@ class LexicalErrorCode:
     
     # Errores de operadores (LEX-300)
     PIPE_OPERATOR = ("LEX-301", "Operador '|' no válido")
-    DOUBLE_PIPE = ("LEX-302", "Operador '||' no válido")
     AMPERSAND_OPERATOR = ("LEX-303", "Operador '&' no válido")
-    DOUBLE_AMPERSAND = ("LEX-304", "Operador '&&' no válido")
     INCOMPLETE_NOT = ("LEX-305", "Operador '!' incompleto")
     
     # Errores de sintaxis (LEX-400)
@@ -270,17 +268,9 @@ def categorize_char_error(char, line_text, column):
         code, category = LexicalErrorCode.PIPE_OPERATOR
         return (code, category, f"Operador '|' no válido (use 'or' para operaciones lógicas)")
     
-    elif char == '||':
-        code, category = LexicalErrorCode.DOUBLE_PIPE
-        return (code, category, f"Operador '||' no válido (use 'or' para operaciones lógicas)")
-    
     elif char == '&':
         code, category = LexicalErrorCode.AMPERSAND_OPERATOR
         return (code, category, f"Operador '&' no válido (use 'and' para operaciones lógicas)")
-    
-    elif char == '&&':
-        code, category = LexicalErrorCode.DOUBLE_AMPERSAND
-        return (code, category, f"Operador '&&' no válido (use 'and' para operaciones lógicas)")
     
     # Punto y coma innecesario
     elif char == ';':

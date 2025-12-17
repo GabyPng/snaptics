@@ -91,25 +91,11 @@ class ErrorsPanel(QtWidgets.QDialog):
 				'ejemplo': 'this | that',
                 'solucion': 'Eliminar operador inválido'
             },
-			{
-				'id': 'LEX-302',
-                'nombre': 'Operador doble pipe',
-				'descripcion': 'El operador || es inválido',
-				'ejemplo': 'this || that',
-                'solucion': 'Eliminar operador inválido'
-            },
             {
 				'id': 'LEX-303',
                 'nombre': 'Operador ampersand',
 				'descripcion': 'El operador & es inválido',
 				'ejemplo': 'this & that',
-                'solucion': 'Eliminar operador inválido'
-            },
-			{
-				'id': 'LEX-304',
-                'nombre': 'Operador doble ampersand',
-				'descripcion': 'El operador && es inválido',
-				'ejemplo': 'this && that',
                 'solucion': 'Eliminar operador inválido'
             },
 			{
@@ -266,13 +252,6 @@ class ErrorsPanel(QtWidgets.QDialog):
                 'solucion': 'Verificar y corregir la sintaxis'
             },
 			{
-				'id': 'SYN-203',
-                'nombre': 'Falta operador',
-				'descripcion': 'Falta un operador entre operandos',
-				'ejemplo': 'x = 5 3',
-                'solucion': 'Agregar operador faltante: x = 5 + 3'
-            },
-			{
 				'id': 'SYN-204',
                 'nombre': 'Token inesperado en expresión',
 				'descripcion': 'Token que no se esperaba en este contexto',
@@ -282,13 +261,6 @@ class ErrorsPanel(QtWidgets.QDialog):
 
 			# ========= Errores de parentesis y delimitadores =========
 
-			{
-				'id': 'SYN-301',
-                'nombre': 'Falta paréntesis de apertura',
-				'descripcion': 'Falta el paréntesis de apertura (',
-				'ejemplo': 'fact x = P ventas > 10)',
-                'solucion': 'Agregar ( antes del operando )'
-            },
 			{
 				'id': 'SYN-302',
                 'nombre': 'Falta paréntesis de cierre',
@@ -302,13 +274,6 @@ class ErrorsPanel(QtWidgets.QDialog):
 				'descripcion': 'Los paréntesis no están balanceados',
 				'ejemplo': 'x = ((5 + 3)',
 				'solucion': 'Verificar y balancear los paréntesis'
-            },
-			{
-				'id': 'SYN-304',
-                'nombre': 'Falta coma en lista',
-				'descripcion': 'Falta una coma entre elementos de lista',
-				'ejemplo': 'select x y z from datos',
-                'solucion': 'agregar comas: select x, y, z from datos'
             },
 			{
 				'id': 'SYN-305',
@@ -334,13 +299,6 @@ class ErrorsPanel(QtWidgets.QDialog):
                 'solucion': 'Completar la condición: where x > 5'
             },
 			{
-				'id': 'SYN-403',
-                'nombre': 'Cláusula SELECT inválida',
-				'descripcion': 'La sintaxis de select es incorrecta',
-				'ejemplo': 'dataset x = select from datos',
-                'solucion': 'Especificar columnas: select col1, col2 from datos'
-            },
-			{
 				'id': 'SYN-404',
                 'nombre': 'Falta cláusula GIVEN',
 				'descripcion': 'Falta given en probabilidad condicional',
@@ -363,23 +321,9 @@ class ErrorsPanel(QtWidgets.QDialog):
 				'ejemplo': 'dataset 123 = import from "file.csv"',
                 'solucion': 'Usar identificador válido que comience con letra'
             },
-			{
-				'id': 'SYN-503',
-                'nombre': 'Identificador duplicado',
-				'descripcion': 'El identificador ya fue declarado',
-				'ejemplo': 'Dos fact x = en el mismo alcance',
-                'solucion': 'Usar nombres únicos para cada declaración'
-            },
 			
 			# ========= Errores de valores y literales =========
 
-			{
-				'id': 'SYN-601',
-                'nombre': 'Falta valor',
-				'descripcion': 'Falta un valor en la expresión',
-				'ejemplo': 'x =',
-                'solucion': 'Agregar el valor: x = 10'
-            },
 			{
 				'id': 'SYN-602',
                 'nombre': 'Número inválido',
@@ -394,36 +338,6 @@ class ErrorsPanel(QtWidgets.QDialog):
 				'ejemplo': 'Cadena mal formada',
                 'solucion': 'Verificar comillas y escapes'
             },
-			{
-				'id': 'SYN-604',
-                'nombre': 'Falta cadena de texto',
-				'descripcion': 'Se esperaba una cadena de texto',
-				'ejemplo': 'import from',
-                'solucion': 'Agregar la ruta: import from "data.csv"'
-            },
-
-			# ========= Errores de operadores =========
-			{
-				'id': 'SYN-701',
-                'nombre': 'Operador inválido',
-				'descripcion': 'El operador no es válido en este contexto',
-				'ejemplo': 'Uso incorrecto de operador',
-                'solucion': 'Verificar la sintaxis del operador'
-            },
-			{
-				'id': 'SYN-702',
-                'nombre': 'Falta operador relacional',
-				'descripcion': 'Falta un operador de comparación',
-				'ejemplo': 'where x 5',
-                'solucion': 'Agregar operador: where x > 5'
-            },
-			{
-				'id': 'SYN-703',
-                'nombre': 'Operador lógico inválido',
-				'descripcion': 'El operador lógico no es correcto',
-				'ejemplo': 'Uso incorrecto de and/or/not',
-                'solucion': 'Verificar la sintaxis lógica'
-            },
 
 			# ========= Errores de probabilidad =========
 
@@ -434,20 +348,6 @@ class ErrorsPanel(QtWidgets.QDialog):
 				'ejemplo': 'P()',
                 'solucion': 'Agregar condición: P(x > 5)'
             },
-			{
-				'id': 'SYN-802',
-                'nombre': 'Falta condición en probabilidad',
-				'descripcion': 'Falta la condición dentro de P()',
-				'ejemplo': 'fact x = P()',
-                'solucion': 'Especificar condición: P(ventas > 100)'
-            },
-			{
-				'id': 'SYN-803',
-                'nombre': 'Sintaxis de probabilidad incorrecta',
-				'descripcion': 'Error en la estructura de probabilidad',
-				'ejemplo': 'P x > 5',
-                'solucion': 'Usar paréntesis: P(x > 5)'
-            },
 
 			# ========= Errores de estructura =========
 			{
@@ -456,29 +356,6 @@ class ErrorsPanel(QtWidgets.QDialog):
 				'descripcion': 'El archivo termina abruptamente',
 				'ejemplo': 'Estructura sin cerrar al final',
                 'solucion': 'Completar todas las declaraciones'
-            },
-			{
-				'id': 'SYN-902',
-                'nombre': 'Declaración incompleta',
-				'descripcion': 'La declaración no está completa',
-				'ejemplo': 'dataset x = al final del archivo',
-                'solucion': 'Completar la declaración'
-            },
-			{
-				'id': 'SYN-903',
-                'nombre': 'Sintaxis inválida',
-				'descripcion': 'Error sintáctico general',
-				'ejemplo': 'Estructura no reconocida',
-                'solucion': 'Revisar la sintaxis según la gramática'
-            },
-
-			# ========= Error general =========
-			{
-				'id': 'SYN-999',
-                'nombre': 'Error sintáctico',
-				'descripcion': 'Error sintáctico no categorizado',
-				'ejemplo': 'Cualquier error no específico',
-                'solucion': 'Revisar la sintaxis general'
             },
 		]
 
