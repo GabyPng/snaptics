@@ -5,7 +5,6 @@ from typing import Dict, Any, List
 """
 Analizador Sintáctico para snaptics
 Análisis de datos probabilístico con razonamiento lógico
-Implementa panic mode recovery con códigos de error específicos
 """
 
 # ==================== CÓDIGOS Y CATEGORÍAS DE ERRORES SINTÁCTICOS ====================
@@ -92,14 +91,14 @@ def p_programa(p):
     '''programa : sentencia
                 | programa sentencia'''
     if len(p) == 2:
-        # Filtrar None (errores recuperados)
+        # Filtrar None (errores)
         if p[1] is not None:
             p[0] = ASTNode('Programa', sentencias=[p[1]], line=p.lineno(1) if p[1] else 0)
         else:
             p[0] = ASTNode('Programa', sentencias=[], line=0)
     else:
         if p[1]:
-            # Filtrar None (errores recuperados)
+            # Filtrar None (errores)
             if p[2] is not None:
                 p[1].properties['sentencias'].append(p[2])
             p[0] = p[1]
@@ -116,7 +115,7 @@ def p_sentencia(p):
                  | declaracion_regla
                  | consulta
                  | error'''
-    # Si es un error recuperado por panic mode, retornar None
+    # Si es un error, retornar None para que no se agregue al AST
     if len(p) == 2 and p.slice[1].type == 'error':
         p[0] = None
     else:
@@ -356,18 +355,10 @@ def p_empty(p):
     '''empty :'''
     pass
 
-# ==================== MANEJO DE ERRORES CON PANIC MODE ====================
+# ==================== MANEJO DE ERRORES ====================
 
 def p_error(p):
-    """
-    Maneja errores sintácticos con panic mode recovery y códigos específicos.
-    
-    Estrategia de Panic Mode:
-    1. Registra el error con código SYN-XXX específico
-    2. Descarta tokens hasta encontrar un punto de sincronización
-    3. Permite que la regla 'sentencia : error' recupere el análisis
-    4. Continúa parseando el resto del código
-    """
+    """Maneja errores sintácticos con categorización y códigos de error."""
     if p:
         # Obtener contexto del parser
         context = _get_parser_context(p)
@@ -378,7 +369,6 @@ def p_error(p):
         # Construir mensaje de error descriptivo
         message = _build_error_message(p, context)
         
-        # Registrar el error
         error = {
             'type': 'syntax_error',
             'code': error_code,
@@ -391,28 +381,6 @@ def p_error(p):
             'context': context
         }
         parser.errors.append(error)
-        
-        # ===== PANIC MODE RECOVERY =====
-        # Tokens de sincronización: inicio de nuevas declaraciones
-        sync_tokens = {'DATASET', 'FACT', 'RULE', 'QUERY'}
-        
-        # Buscar punto de sincronización descartando tokens
-        while True:
-            tok = parser.token()
-            if not tok:
-                # Llegamos al final del archivo sin encontrar sincronización
-                break
-            
-            if tok.type in sync_tokens:
-                # Encontrado punto de sincronización
-                # Restablecer el parser a un estado consistente
-                parser.errok()
-                return tok
-        
-        # Si llegamos aquí, alcanzamos EOF
-        # El parser continuará con la regla 'sentencia : error'
-        parser.restart()
-        
     else:
         # Error al final del archivo
         code, category = SyntaxErrorCode.UNEXPECTED_EOF
@@ -434,15 +402,15 @@ def _determine_error_code(p, context):
     token_type = p.type if hasattr(p, 'type') else None
     token_value = p.value if hasattr(p, 'value') else None
     
-    # Mapeo de contextos y tokens a códigos de error SYN-XXX
+    # Mapeo de contextos y tokens a códigos de error
     
-    # Errores de paréntesis (SYN-300 series)
+    # Errores de paréntesis
     if token_type == 'RPAREN':
         return SyntaxErrorCode.UNMATCHED_PAREN
     elif token_type == 'LPAREN':
         return SyntaxErrorCode.MISSING_RPAREN
     
-    # Errores en declaraciones de dataset (SYN-100 series)
+    # Errores en declaraciones
     if 'dataset' in context.lower():
         if token_type == 'ASIG':
             return SyntaxErrorCode.MISSING_IDENTIFIER
@@ -450,23 +418,20 @@ def _determine_error_code(p, context):
             return SyntaxErrorCode.MISSING_ASSIGNMENT
         return SyntaxErrorCode.INCOMPLETE_DATASET
     
-    # Errores en declaraciones de hechos
     if 'hecho' in context.lower() or 'fact' in context.lower():
         if token_type == 'ASIG':
             return SyntaxErrorCode.MISSING_IDENTIFIER
         return SyntaxErrorCode.INCOMPLETE_FACT
     
-    # Errores en declaraciones de reglas
     if 'regla' in context.lower() or 'rule' in context.lower():
         if token_type == 'COND':
             return SyntaxErrorCode.MISSING_IDENTIFIER
         return SyntaxErrorCode.INCOMPLETE_RULE
     
-    # Errores en consultas
     if 'consulta' in context.lower() or 'query' in context.lower():
         return SyntaxErrorCode.INCOMPLETE_QUERY
     
-    # Errores en expresiones (SYN-200 series)
+    # Errores en expresiones
     if 'expresión' in context.lower():
         if token_type in ('ADD', 'SUB', 'MUL', 'DIV', 'POW'):
             return SyntaxErrorCode.MISSING_OPERAND
@@ -476,29 +441,31 @@ def _determine_error_code(p, context):
             return SyntaxErrorCode.UNEXPECTED_COMMA
         return SyntaxErrorCode.INVALID_EXPRESSION
     
-    # Errores de comas (SYN-300 series)
+    # Errores de comas
     if token_type == 'COMMA':
         return SyntaxErrorCode.UNEXPECTED_COMMA
     
-    # Errores de cláusulas (SYN-400 series)
+    # Errores de FROM
     if context == 'cláusula FROM' or token_type == 'FROM':
         return SyntaxErrorCode.MISSING_FROM
     
+    # Errores de WHERE
     if context == 'condición WHERE' or token_type == 'WHERE':
         return SyntaxErrorCode.MISSING_WHERE
     
+    # Errores de GIVEN (probabilidad condicional)
     if token_type == 'GIVEN':
         return SyntaxErrorCode.MISSING_GIVEN
     
-    # Errores de probabilidad (SYN-800 series)
+    # Errores de probabilidad
     if 'prob' in context.lower() or token_type == 'PROB':
         return SyntaxErrorCode.INVALID_PROBABILITY
     
-    # Errores de identificadores (SYN-500 series)
+    # Errores de identificadores
     if token_type == 'ID':
         return SyntaxErrorCode.INVALID_IDENTIFIER
     
-    # Errores de valores (SYN-600 series)
+    # Errores de valores
     if token_type in ('INT', 'REAL'):
         return SyntaxErrorCode.INVALID_NUMBER
     elif token_type == 'STRING':
@@ -527,7 +494,6 @@ def _get_parser_context(p):
         'VAR': 'métrica estadística',
         'STD': 'métrica estadística',
         'CORRELATION': 'métrica estadística',
-        'COND': 'definición de regla',
     }
     
     token_type = p.type if hasattr(p, 'type') else None
@@ -601,14 +567,10 @@ def parse(text: str, debug=False) -> Dict[str, Any]:
     """
     Parsea el texto y devuelve el AST y errores.
     
-    Args:
-        text: Código fuente a parsear
-        debug: Si True, muestra información de depuración
-    
     Returns:
         Dict con:
-        - 'ast': Árbol de sintaxis abstracta (None si hay errores)
-        - 'errors': Lista de errores sintácticos con códigos SYN-XXX
+        - 'ast': Árbol de sintaxis abstracta
+        - 'errors': Lista de errores sintácticos
         - 'success': Boolean indicando éxito
     """
     lexer_instance = make_lexer()
@@ -619,26 +581,19 @@ def parse(text: str, debug=False) -> Dict[str, Any]:
     try:
         ast = parser_instance.parse(text, lexer=lexer_instance, debug=debug)
         
-        # Combinar errores del lexer y parser
-        all_errors = lexer_instance.errors + parser_instance.errors
-        
-        # IMPORTANTE: Solo retornar AST si NO hay errores
-        # Si hay errores, retornar None aunque se haya generado un AST parcial
-        final_ast = ast if len(all_errors) == 0 else None
-        
         return {
-            'ast': final_ast,
-            'errors': all_errors,
-            'success': len(all_errors) == 0 and ast is not None
+            'ast': ast,
+            'errors': parser_instance.errors,
+            'success': len(parser_instance.errors) == 0
         }
     except Exception as e:
         return {
             'ast': None,
             'errors': parser_instance.errors + lexer_instance.errors + [{
                 'type': 'critical_error',
-                'code': 'SYN-999',
+                'code': 'SYN-ERROR',
                 'category': 'Error crítico',
-                'message': f"Error crítico durante el análisis sintáctico: {str(e)}"
+                'message': f"Error crítico: {str(e)}"
             }],
             'success': False
         }
@@ -668,36 +623,26 @@ def print_ast(node, indent=0):
         print(f"{prefix}{node}")
 
 def format_syntax_errors(errors: List[Dict], source_text: str = "") -> str:
-    """
-    Formatea errores sintácticos para mostrar en consola con códigos SYN-XXX.
-    
-    Args:
-        errors: Lista de diccionarios con información de errores
-        source_text: Código fuente original (para mostrar contexto)
-    
-    Returns:
-        String formateado con los errores, códigos y contexto
-    """
+    """Formatea errores sintácticos para mostrar en consola con códigos de error"""
     if not errors:
         return ""
     
     lines = []
     source_lines = source_text.splitlines() if source_text else []
     
-    for i, error in enumerate(errors, 1):
+    for error in errors:
         code = error.get('code', 'SYN-???')
         category = error.get('category', 'Error sintáctico')
         line_num = error.get('line')
         col_num = error.get('column', 1)
         message = error.get('message', 'Error desconocido')
-        context = error.get('context', '')
-        
-        # Encabezado del error con código
-        lines.append(f"[Error {i}] [{code}] {category}")
         
         if line_num == 'EOF':
+            lines.append(f"[{code}] {category}")
             lines.append(f"  Final del archivo: {message}")
         else:
+            # Formato con código de error
+            lines.append(f"[{code}] {category}")
             lines.append(f"  Línea {line_num}, Columna {col_num}: {message}")
             
             # Mostrar la línea de código si está disponible
@@ -708,10 +653,12 @@ def format_syntax_errors(errors: List[Dict], source_text: str = "") -> str:
                 if isinstance(col_num, int) and col_num > 0:
                     lines.append(f"  {' ' * (col_num - 1)}^")
         
-            # Información adicional
-            if context:
-                lines.append(f"  Contexto: {context}")
-        
         lines.append("")  # Línea en blanco entre errores
     
     return "\n".join(lines)
+
+def print_syntax_errors(errors: List[Dict[str, Any]], source_text: str = ""):
+    """Imprime los errores sintácticos de manera formateada para debugging"""
+    formatted = format_syntax_errors(errors, source_text)
+    if formatted:
+        print(formatted)

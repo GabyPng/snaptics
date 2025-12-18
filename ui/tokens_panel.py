@@ -135,9 +135,6 @@ class TokensPanel(QtWidgets.QWidget):
         self.table.doubleClicked.connect(self._on_table_double_clicked)
         self.table.activated.connect(self._on_table_activated)
 
-        # Ordenar por columna LINE (índice 0) en orden ascendente
-        self.table.sortByColumn(0, QtCore.Qt.SortOrder.AscendingOrder)
-
         layout.addLayout(filter_layout)
         layout.addWidget(self.table)
 

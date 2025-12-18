@@ -176,23 +176,6 @@ class ErrorsPanel(QtWidgets.QDialog):
 				'ejemplo': '/* comentario */ erroneo */',
                 'solucion': 'Verficiar y corregir el formato del comentario'
             },
-
-			# ========= Errores de números =========
-
-			{
-				'id': 'LEX-651',
-				'nombre': 'Número malformado',
-				'descripcion': 'Formato de número incorrecto o inválido',
-				'ejemplo': '3.14.e10',
-				'solucion': 'Verificar el formato del número (debe ser entero o decimal válido)'
-			},
-			{
-				'id': 'LEX-652',
-				'nombre': 'Número con múltiples puntos decimales',
-				'descripcion': 'Número con más de un punto decimal',
-				'ejemplo': '0.60.0 o 123.45.67',
-				'solucion': 'Los números decimales solo pueden tener un punto (ej: 0.60 o 123.4567)'
-			},
 			
             # ========= Errores de palabras reservadas =========
 			

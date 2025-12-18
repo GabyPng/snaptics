@@ -32,7 +32,7 @@ class FileManager:
         
         file_path, _ = QtWidgets.QFileDialog.getOpenFileName(
             self.main_window, "Abrir archivo", "", 
-            "Archivos Snaptics (*.snp);;Archivos Python (*.py);;Archivos de texto (*.txt);;Todos los archivos (*)"
+            "Archivos Python (*.py);;Archivos de texto (*.txt);;Todos los archivos (*)"
         )
         
         if file_path:
