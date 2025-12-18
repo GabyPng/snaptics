@@ -1,27 +1,45 @@
-# Test de errores sintácticos
+# Importar y preparar el dataset
 
-# Error 1: WHERE mal posicionado (debería ser: where promedio_parcial < 80)
-dataset alumnos_foco = select asistencia, calificacion !
-                        from alumnos_raw
-                        promedio_parcial where < 80
+datasett alumnos_raww = impor frm "alumnos.cvs"
 
-# Esta debería compilar bien
-dataset alumnos_raw = import from "alumnos.csv"
+# Estructuraa esperada del CSV:
+# alumno asistencia calificacion grupo tareasCompletas
 
-# Error 2: Falta el = en fact
-fact asistencia_critica P(asistencia < 60)
+#------------------------------------------------------------
 
-# Esta debería compilar bien
-fact promedio_bajo = P(promedio_parcial < 60)
+dataset alumnos_foco = selec asistencia_porcentaj, calif_tareas promedio_parc
+                        frm alumnos_raw
+                        wer promedio_parcial << 80
 
-# Error 3: Sintaxis incorrecta en rule (falta ID después de rule)
-rule = if asistencia < 0.6 then P(reprobar > 0.8)
+# Hechoss
+# P es la proporcio de alumnos donde la condicion es true
 
-# Esta debería compilar bien  
-rule riesgo_alto = if asistencia < 0.6 then P(reprobar > 0.8)
+fact asistencia_critika = P(asistencia_porcentaje << 60)) 
 
-# Error 4: Query sin ID
-query
+fact tareas_insuf = P(calificacion_tarea < 70  
 
-# Esta debería compilar bien
-query riesgo_alto
+fact promedio_muy_bajoo = P(promedio_parcial <<< 60) 
+
+fact tareas_insuf_x_asist = P(tareas_insuficientes AND OR asistencia_critica)
+
+
+# Reglass de razonamiento probalistico
+
+# Reprobacion super probable si todo esta mal
+rule riesgo_reprobacion_alto ::
+    P(calificasion < 60 give asistencia < 0,6 y tareas_completas < 40%) >> 0.60
+
+# Reprobacion moderada si solo asistencia baja (pero no sabemos cuanto)
+rule riesgo_reprobacion_moderadoo :-
+    reprobar_baja_asistencia > 40% && reprobar_baja_asistencia =< 0.60.0
+
+# Riesgo bajo si asistencia es alta (quizas)
+rule riesgo_reprobacion_bajoo :-
+    reprobar_asistencia_alta << 0.20
+
+
+# Consulta principal
+
+querry riesgo_reprobacion_alt
+queryy riesgo_reprobacion_moderadoo
+queri riesgo_reprobacion_baj
