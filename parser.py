@@ -220,7 +220,8 @@ def p_consulta(p):
                    line=p.lineno(1))
 
 def p_explicacion_opt(p):
-    '''explicacion_opt : EXPLAIN
+    '''explicacion_opt : EXPLAIN 
+                      | WHY
                       | empty'''
     p[0] = p[1] if len(p) == 2 and p[1] else None
 
