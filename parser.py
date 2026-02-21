@@ -1,6 +1,7 @@
 import ply.yacc as yacc
 from lexer import tokens, make_lexer
 from typing import Dict, Any, List
+from symbol_table import SymbolTable
 
 """
 Analizador Sintáctico para snaptics
@@ -128,6 +129,8 @@ def p_importacion(p):
                    dataset_id=p[2],
                    source_file=p[6],
                    line=p.lineno(1))
+    # Registrar símbolo
+    p.parser.symbol_table.add(p[2], 'dataset', 'source', p.lineno(2))
 
 def p_preprocesamiento_completo(p):
     '''preprocesamiento : DATASET ID ASIG SELECT lista_ids FROM ID condicion_opt agrupacion_opt descubrimiento_opt'''
@@ -139,6 +142,8 @@ def p_preprocesamiento_completo(p):
                    agrupacion=p[9],
                    descubrimiento=p[10],
                    line=p.lineno(1))
+    # Registrar símbolo
+    p.parser.symbol_table.add(p[2], 'dataset', 'derived', p.lineno(2))
 
 def p_lista_ids(p):
     '''lista_ids : ID
@@ -179,6 +184,8 @@ def p_declaracion_hecho(p):
                        fact_id=p[2],
                        probabilidad=p[6],
                        line=p.lineno(1))
+        # Registrar símbolo
+        p.parser.symbol_table.add(p[2], 'fact', 'probabilistic', p.lineno(2))
     else:
         p[0] = p[1]
 
@@ -188,6 +195,8 @@ def p_declaracion_metrica(p):
                    var_id=p[1],
                    metrica=p[3],
                    line=p.lineno(1))
+    # Registrar símbolo
+    p.parser.symbol_table.add(p[1], 'metric', 'numeric', p.lineno(1))
 
 def p_metrica_estatica(p):
     '''metrica_estatica : MEAN LPAREN ID DOT ID RPAREN
@@ -212,6 +221,8 @@ def p_declaracion_regla(p):
                    rule_id=p[2],
                    condicion=p[4],
                    line=p.lineno(1))
+    # Registrar símbolo
+    p.parser.symbol_table.add(p[2], 'rule', 'logic', p.lineno(2))
 
 def p_consulta(p):
     '''consulta : QUERY ID explicacion_opt'''
@@ -219,6 +230,8 @@ def p_consulta(p):
                    query_id=p[2],
                    explicacion=p[3],
                    line=p.lineno(1))
+    # Registrar símbolo (opcional, como referencia)
+    p.parser.symbol_table.add(p[2], 'query', 'query', p.lineno(2))
 
 def p_explicacion_opt(p):
     '''explicacion_opt : EXPLAIN
@@ -593,6 +606,7 @@ def make_parser():
     global parser
     parser = yacc.yacc()
     parser.errors = []
+    parser.symbol_table = SymbolTable()
     return parser
 
 # ==================== FUNCIÓN DE PARSING ====================
@@ -625,10 +639,12 @@ def parse(text: str, debug=False) -> Dict[str, Any]:
         # IMPORTANTE: Solo retornar AST si NO hay errores
         # Si hay errores, retornar None aunque se haya generado un AST parcial
         final_ast = ast if len(all_errors) == 0 else None
+        final_symbol_table = parser_instance.symbol_table if len(all_errors) == 0 else None
         
         return {
             'ast': final_ast,
             'errors': all_errors,
+            'symbol_table': final_symbol_table,
             'success': len(all_errors) == 0 and ast is not None
         }
     except Exception as e:

@@ -390,6 +390,7 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
                 
                 # Guardar el AST para uso posterior
                 self.last_ast = parse_result['ast']
+                self.last_symbol_table = parse_result.get('symbol_table')
                 
                 # Mostrar el AST en la pestaña correspondiente
                 self._display_ast(parse_result['ast'])
@@ -590,57 +591,47 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
 
     def _open_symbols_dialog(self):
         """Abrir diálogo con tabla de símbolos usando el arreglo de tokens existente."""
+        # Usar la tabla de símbolos generada por el parser si existe
+        symbols_list = []
+        if hasattr(self, 'last_symbol_table') and self.last_symbol_table:
+            symbols_list = self.last_symbol_table.get_all()
+        
+        if not symbols_list:
+            QtWidgets.QMessageBox.information(self, "Tabla de Símbolos", "No hay símbolos disponibles. Compile el código primero.")
+            return
+
         try:
-            tokens = self._get_existing_tokens()
-
-            symbols = {}
-            for t in tokens:
-                try:
-                    if t.get('type') == 'ID':
-                        name = t.get('value')
-                        if name is None:
-                            continue
-                        name = str(name)
-                        # normalizar (por si el token viene con comillas)
-                        if (name.startswith("'") and name.endswith("'")) or (name.startswith('"') and name.endswith('"')):
-                            name = name[1:-1]
-                        line_no = int(t.get('line', 0)) if t.get('line') is not None else 0
-                        if name not in symbols or (line_no and line_no < symbols[name]):
-                            symbols[name] = line_no
-                except Exception:
-                    continue
-
             # Crear diálogo con tabla
             dialog = QtWidgets.QDialog(self)
             dialog.setWindowTitle("Symbol Table")
             layout = QtWidgets.QVBoxLayout(dialog)
 
             table = QtWidgets.QTableWidget(parent=dialog)
-            table.setColumnCount(2)
-            table.setHorizontalHeaderLabels(["Name", "Line"])
-            table.setRowCount(len(symbols))
+            table.setColumnCount(4)
+            table.setHorizontalHeaderLabels(["Name", "Category", "Type", "Line"])
+            table.setRowCount(len(symbols_list))
             table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
             table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
             table.horizontalHeader().setStretchLastSection(True)
 
             # Ordenar por número de línea (asc)
             def _sort_key(item):
-                name, ln = item
-                ln_val = int(ln) if ln is not None else 0
-                
+                ln_val = item.line
                 sort_ln = ln_val if ln_val > 0 else float('inf')
-                return (sort_ln, name.lower())
+                return (sort_ln, item.name.lower())
 
-            for i, (name, line_no) in enumerate(sorted(symbols.items(), key=_sort_key)):
-                table.setItem(i, 0, QtWidgets.QTableWidgetItem(name))
-                table.setItem(i, 1, QtWidgets.QTableWidgetItem(str(line_no)))
+            for i, sym in enumerate(sorted(symbols_list, key=_sort_key)):
+                table.setItem(i, 0, QtWidgets.QTableWidgetItem(str(sym.name)))
+                table.setItem(i, 1, QtWidgets.QTableWidgetItem(str(sym.category)))
+                table.setItem(i, 2, QtWidgets.QTableWidgetItem(str(sym.data_type)))
+                table.setItem(i, 3, QtWidgets.QTableWidgetItem(str(sym.line)))
 
             layout.addWidget(table)
             buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.StandardButton.Close, parent=dialog)
             buttons.rejected.connect(dialog.reject)
             layout.addWidget(buttons)
 
-            dialog.resize(420, 300)
+            dialog.resize(550, 350)
             dialog.exec()
         except Exception as e:
             self._print_to_terminal(f"[Symbols] Error al generar tabla de símbolos:\n{e}")

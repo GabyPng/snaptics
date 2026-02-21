@@ -24,8 +24,9 @@ def main():
     except ImportError as e:
         print("Error de importación:")
         print(f"   {e}")
-        print("\nSolución:")
-        print("   pip install PyQt6")
+        if 'PyQt6' in str(e):
+            print("\nSolución:")
+            print("   pip install PyQt6")
         return 1
         
     except Exception as e:
