@@ -130,7 +130,7 @@ def p_importacion(p):
                    source_file=p[6],
                    line=p.lineno(1))
     # Registrar símbolo
-    p.parser.symbol_table.add(p[2], 'dataset', 'source', p.lineno(2))
+    p.parser.symbol_table.add(p[2], None, None, p.lineno(2))
 
 def p_preprocesamiento_completo(p):
     '''preprocesamiento : DATASET ID ASIG SELECT lista_ids FROM ID condicion_opt agrupacion_opt descubrimiento_opt'''
@@ -143,7 +143,7 @@ def p_preprocesamiento_completo(p):
                    descubrimiento=p[10],
                    line=p.lineno(1))
     # Registrar símbolo
-    p.parser.symbol_table.add(p[2], 'dataset', 'derived', p.lineno(2))
+    p.parser.symbol_table.add(p[2], None, None, p.lineno(2))
 
 def p_lista_ids(p):
     '''lista_ids : ID
@@ -185,7 +185,7 @@ def p_declaracion_hecho(p):
                        probabilidad=p[6],
                        line=p.lineno(1))
         # Registrar símbolo
-        p.parser.symbol_table.add(p[2], 'fact', 'probabilistic', p.lineno(2))
+        p.parser.symbol_table.add(p[2], None, None, p.lineno(2))
     else:
         p[0] = p[1]
 
@@ -196,7 +196,7 @@ def p_declaracion_metrica(p):
                    metrica=p[3],
                    line=p.lineno(1))
     # Registrar símbolo
-    p.parser.symbol_table.add(p[1], 'metric', 'numeric', p.lineno(1))
+    p.parser.symbol_table.add(p[1], None, None, p.lineno(1))
 
 def p_metrica_estatica(p):
     '''metrica_estatica : MEAN LPAREN ID DOT ID RPAREN
@@ -222,7 +222,7 @@ def p_declaracion_regla(p):
                    condicion=p[4],
                    line=p.lineno(1))
     # Registrar símbolo
-    p.parser.symbol_table.add(p[2], 'rule', 'logic', p.lineno(2))
+    p.parser.symbol_table.add(p[2], None, None, p.lineno(2))
 
 def p_consulta(p):
     '''consulta : QUERY ID explicacion_opt'''
@@ -231,7 +231,7 @@ def p_consulta(p):
                    explicacion=p[3],
                    line=p.lineno(1))
     # Registrar símbolo (opcional, como referencia)
-    p.parser.symbol_table.add(p[2], 'query', 'query', p.lineno(2))
+    p.parser.symbol_table.add(p[2], None, None, p.lineno(2))
 
 def p_explicacion_opt(p):
     '''explicacion_opt : EXPLAIN
