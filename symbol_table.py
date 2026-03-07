@@ -26,8 +26,21 @@ class SymbolTable:
             return True
         return False
 
+    def exists(self, name: str) -> bool:
+        """Retorna True si el símbolo está declarado."""
+        return name in self.symbols
+
+    def get(self, name: str):
+        """Retorna el Symbol o None si no existe."""
+        return self.symbols.get(name)
+
+    def get_category(self, name: str):
+        """Retorna la categoría del símbolo ('dataset', 'fact', 'rule', 'metric') o None."""
+        symbol = self.symbols.get(name)
+        return symbol.category if symbol else None
+
     def get_all(self):
         return list(self.symbols.values())
-    
+
     def clear(self):
         self.symbols = {}

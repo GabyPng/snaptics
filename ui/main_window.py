@@ -8,6 +8,7 @@ import traceback
 import lexer # NO MOVER !!
 import parser as syntax_parser
 from parser import ASTNode
+from semantic.semantic_analyzer import analyze as semantic_analyze
 from .ui_base import Ui_snaptics
 from .tokens_panel import TokensPanel
 from .terminal_controller import TerminalController
@@ -385,30 +386,49 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
                     f"Consulta la terminal para ver los detalles completos."
                 )
             else:
-                # Compilación exitosa - mostrar mensaje en terminal
-                self._print_to_terminal("Compilación exitosa")
-                
-                # Guardar el AST para uso posterior
-                self.last_ast = parse_result['ast']
-                self.last_symbol_table = parse_result.get('symbol_table')
-                
-                # Mostrar el AST en la pestaña correspondiente
-                self._display_ast(parse_result['ast'])
-                
-                # Cambiar automáticamente a la pestaña del AST
-                if hasattr(self.ui, 'tabBar'):
-                    self.ui.tabBar.setCurrentIndex(1)  # Índice 1 = pestaña AST
-                
-                # Mostrar mensaje de éxito
-                num_tokens = len(lex_result['tokens'])
-                QtWidgets.QMessageBox.information(
-                    self,
-                    "Compilación Exitosa",
-                    f"La compilación se completó sin errores.\n\n"
-                    f"• Tokens generados: {num_tokens}\n"
-                    f"• AST generado correctamente\n\n"
-                    f"El AST se muestra en la pestaña 'AST'."
-                )
+                # Análisis semántico
+                semantic_result = semantic_analyze(parse_result)
+                semantic_errors = semantic_result.get('errors', [])
+                has_semantic_errors = len(semantic_errors) > 0
+
+                if has_semantic_errors:
+                    lines = ["✗ ERRORES SEMÁNTICOS ENCONTRADOS", ""]
+                    for err in semantic_errors:
+                        lines.append(str(err))
+                    self._print_to_terminal("\n".join(lines))
+
+                    self.last_ast = None
+                    QtWidgets.QMessageBox.critical(
+                        self,
+                        "Errores Semánticos",
+                        f"Se encontraron {len(semantic_errors)} error(es) semántico(s).\n\n"
+                        f"Consulta la terminal para ver los detalles completos."
+                    )
+                else:
+                    # Compilación exitosa - mostrar mensaje en terminal
+                    self._print_to_terminal("Compilación exitosa")
+
+                    # Guardar el AST para uso posterior
+                    self.last_ast = parse_result['ast']
+                    self.last_symbol_table = parse_result.get('symbol_table')
+
+                    # Mostrar el AST en la pestaña correspondiente
+                    self._display_ast(parse_result['ast'])
+
+                    # Cambiar automáticamente a la pestaña del AST
+                    if hasattr(self.ui, 'tabBar'):
+                        self.ui.tabBar.setCurrentIndex(1)  # Índice 1 = pestaña AST
+
+                    # Mostrar mensaje de éxito
+                    num_tokens = len(lex_result['tokens'])
+                    QtWidgets.QMessageBox.information(
+                        self,
+                        "Compilación Exitosa",
+                        f"La compilación se completó sin errores.\n\n"
+                        f"• Tokens generados: {num_tokens}\n"
+                        f"• AST generado correctamente\n\n"
+                        f"El AST se muestra en la pestaña 'AST'."
+                    )
                 
         except Exception as e:
             error_msg = (
