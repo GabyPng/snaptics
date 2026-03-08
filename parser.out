@@ -42,7 +42,7 @@ Rule 24    agrupacion_opt -> empty
 Rule 25    descubrimiento_opt -> AUTO_DISCOVER lista_hechos
 Rule 26    descubrimiento_opt -> empty
 Rule 27    lista_hechos -> DATASET LPAREN ID RPAREN WHERE CORRELATION operador_relacional REAL
-Rule 28    declaracion_hecho -> FACT ID ASIG PROB LPAREN expresion RPAREN
+Rule 28    declaracion_hecho -> FACT ID ASIG probabilidad_condicional
 Rule 29    declaracion_hecho -> declaracion_metrica
 Rule 30    declaracion_metrica -> ID ASIG metrica_estatica
 Rule 31    metrica_estatica -> MEAN LPAREN ID DOT ID RPAREN
@@ -129,18 +129,18 @@ IMPORT               : 9
 INT                  : 71
 LEQ                  : 56
 LESSTHAN             : 58
-LPAREN               : 27 28 31 32 33 34 45 52 53 78
+LPAREN               : 27 31 32 33 34 45 52 53 78
 MEAN                 : 31
 MUL                  : 63
 NEQ                  : 55
 NOT                  : 43
 OR                   : 39
 POW                  : 69
-PROB                 : 28 52 53
+PROB                 : 52 53
 QUERY                : 36
 RANGE                : 
 REAL                 : 27 72
-RPAREN               : 27 28 31 32 33 34 45 52 53 78
+RPAREN               : 27 31 32 33 34 45 52 53 78
 RULE                 : 35
 SELECT               : 10
 STD                  : 33
@@ -169,7 +169,7 @@ declaracion_regla    : 6
 descubrimiento_opt   : 10
 empty                : 22 24 26 38
 explicacion_opt      : 36
-expresion            : 21 28 35 39 45 52 53 53 78
+expresion            : 21 35 39 45 52 53 53 78
 factor_aritmetico    : 60 61 62 63 64
 factor_logico        : 43 44
 importacion          : 3
@@ -180,7 +180,7 @@ metrica_estatica     : 30
 operador_relacional  : 27 51
 potencia             : 66 67 68
 preprocesamiento     : 4
-probabilidad_condicional : 47 79
+probabilidad_condicional : 28 47 79
 programa             : 2 0
 sentencia            : 1 2
 termino_aritmetico   : 51 51 60 61
@@ -206,7 +206,7 @@ state 0
     (8) sentencia -> . error
     (9) importacion -> . DATASET ID ASIG IMPORT FROM STRING
     (10) preprocesamiento -> . DATASET ID ASIG SELECT lista_cols_tipadas FROM ID condicion_opt agrupacion_opt descubrimiento_opt
-    (28) declaracion_hecho -> . FACT ID ASIG PROB LPAREN expresion RPAREN
+    (28) declaracion_hecho -> . FACT ID ASIG probabilidad_condicional
     (29) declaracion_hecho -> . declaracion_metrica
     (35) declaracion_regla -> . RULE ID COND expresion
     (36) consulta -> . QUERY ID explicacion_opt
@@ -240,7 +240,7 @@ state 1
     (8) sentencia -> . error
     (9) importacion -> . DATASET ID ASIG IMPORT FROM STRING
     (10) preprocesamiento -> . DATASET ID ASIG SELECT lista_cols_tipadas FROM ID condicion_opt agrupacion_opt descubrimiento_opt
-    (28) declaracion_hecho -> . FACT ID ASIG PROB LPAREN expresion RPAREN
+    (28) declaracion_hecho -> . FACT ID ASIG probabilidad_condicional
     (29) declaracion_hecho -> . declaracion_metrica
     (35) declaracion_regla -> . RULE ID COND expresion
     (36) consulta -> . QUERY ID explicacion_opt
@@ -369,7 +369,7 @@ state 10
 
 state 11
 
-    (28) declaracion_hecho -> FACT . ID ASIG PROB LPAREN expresion RPAREN
+    (28) declaracion_hecho -> FACT . ID ASIG probabilidad_condicional
 
     ID              shift and go to state 18
 
@@ -439,7 +439,7 @@ state 17
 
 state 18
 
-    (28) declaracion_hecho -> FACT ID . ASIG PROB LPAREN expresion RPAREN
+    (28) declaracion_hecho -> FACT ID . ASIG probabilidad_condicional
 
     ASIG            shift and go to state 27
 
@@ -522,10 +522,13 @@ state 26
 
 state 27
 
-    (28) declaracion_hecho -> FACT ID ASIG . PROB LPAREN expresion RPAREN
+    (28) declaracion_hecho -> FACT ID ASIG . probabilidad_condicional
+    (52) probabilidad_condicional -> . PROB LPAREN expresion RPAREN
+    (53) probabilidad_condicional -> . PROB LPAREN expresion GIVEN expresion RPAREN
 
-    PROB            shift and go to state 38
+    PROB            shift and go to state 39
 
+    probabilidad_condicional       shift and go to state 38
 
 state 28
 
@@ -566,25 +569,25 @@ state 28
     (78) valor_base -> . LPAREN expresion RPAREN
     (79) valor_base -> . probabilidad_condicional
 
-    NOT             shift and go to state 43
-    LPAREN          shift and go to state 45
-    ID              shift and go to state 39
-    TRUE            shift and go to state 48
-    FALSE           shift and go to state 49
-    PROB            shift and go to state 51
+    NOT             shift and go to state 44
+    LPAREN          shift and go to state 46
+    ID              shift and go to state 40
+    TRUE            shift and go to state 49
+    FALSE           shift and go to state 50
+    PROB            shift and go to state 39
     SUB             shift and go to state 54
     ADD             shift and go to state 52
     INT             shift and go to state 58
     REAL            shift and go to state 59
     STRING          shift and go to state 60
 
-    expresion                      shift and go to state 40
-    termino_comparacion            shift and go to state 41
-    termino_logico                 shift and go to state 42
-    factor_logico                  shift and go to state 44
-    termino_relacional             shift and go to state 46
-    probabilidad_condicional       shift and go to state 47
-    termino_aritmetico             shift and go to state 50
+    expresion                      shift and go to state 41
+    termino_comparacion            shift and go to state 42
+    termino_logico                 shift and go to state 43
+    factor_logico                  shift and go to state 45
+    termino_relacional             shift and go to state 47
+    probabilidad_condicional       shift and go to state 48
+    termino_aritmetico             shift and go to state 51
     factor_aritmetico              shift and go to state 53
     unario_aritmetico              shift and go to state 55
     potencia                       shift and go to state 56
@@ -679,12 +682,26 @@ state 37
 
 state 38
 
-    (28) declaracion_hecho -> FACT ID ASIG PROB . LPAREN expresion RPAREN
+    (28) declaracion_hecho -> FACT ID ASIG probabilidad_condicional .
+
+    error           reduce using rule 28 (declaracion_hecho -> FACT ID ASIG probabilidad_condicional .)
+    DATASET         reduce using rule 28 (declaracion_hecho -> FACT ID ASIG probabilidad_condicional .)
+    FACT            reduce using rule 28 (declaracion_hecho -> FACT ID ASIG probabilidad_condicional .)
+    RULE            reduce using rule 28 (declaracion_hecho -> FACT ID ASIG probabilidad_condicional .)
+    QUERY           reduce using rule 28 (declaracion_hecho -> FACT ID ASIG probabilidad_condicional .)
+    ID              reduce using rule 28 (declaracion_hecho -> FACT ID ASIG probabilidad_condicional .)
+    $end            reduce using rule 28 (declaracion_hecho -> FACT ID ASIG probabilidad_condicional .)
+
+
+state 39
+
+    (52) probabilidad_condicional -> PROB . LPAREN expresion RPAREN
+    (53) probabilidad_condicional -> PROB . LPAREN expresion GIVEN expresion RPAREN
 
     LPAREN          shift and go to state 69
 
 
-state 39
+state 40
 
     (48) factor_logico -> ID .
     (76) valor_base -> ID .
@@ -717,7 +734,7 @@ state 39
     DOT             shift and go to state 70
 
 
-state 40
+state 41
 
     (35) declaracion_regla -> RULE ID COND expresion .
     (39) expresion -> expresion . OR termino_comparacion
@@ -732,7 +749,7 @@ state 40
     OR              shift and go to state 71
 
 
-state 41
+state 42
 
     (40) expresion -> termino_comparacion .
     (41) termino_comparacion -> termino_comparacion . AND termino_logico
@@ -752,7 +769,7 @@ state 41
     AND             shift and go to state 72
 
 
-state 42
+state 43
 
     (42) termino_comparacion -> termino_logico .
 
@@ -771,7 +788,7 @@ state 42
     AUTO_DISCOVER   reduce using rule 42 (termino_comparacion -> termino_logico .)
 
 
-state 43
+state 44
 
     (43) termino_logico -> NOT . factor_logico
     (45) factor_logico -> . LPAREN expresion RPAREN
@@ -804,11 +821,11 @@ state 43
     (78) valor_base -> . LPAREN expresion RPAREN
     (79) valor_base -> . probabilidad_condicional
 
-    LPAREN          shift and go to state 45
-    ID              shift and go to state 39
-    TRUE            shift and go to state 48
-    FALSE           shift and go to state 49
-    PROB            shift and go to state 51
+    LPAREN          shift and go to state 46
+    ID              shift and go to state 40
+    TRUE            shift and go to state 49
+    FALSE           shift and go to state 50
+    PROB            shift and go to state 39
     SUB             shift and go to state 54
     ADD             shift and go to state 52
     INT             shift and go to state 58
@@ -816,15 +833,15 @@ state 43
     STRING          shift and go to state 60
 
     factor_logico                  shift and go to state 73
-    termino_relacional             shift and go to state 46
-    probabilidad_condicional       shift and go to state 47
-    termino_aritmetico             shift and go to state 50
+    termino_relacional             shift and go to state 47
+    probabilidad_condicional       shift and go to state 48
+    termino_aritmetico             shift and go to state 51
     factor_aritmetico              shift and go to state 53
     unario_aritmetico              shift and go to state 55
     potencia                       shift and go to state 56
     valor_base                     shift and go to state 57
 
-state 44
+state 45
 
     (44) termino_logico -> factor_logico .
 
@@ -843,7 +860,7 @@ state 44
     AUTO_DISCOVER   reduce using rule 44 (termino_logico -> factor_logico .)
 
 
-state 45
+state 46
 
     (45) factor_logico -> LPAREN . expresion RPAREN
     (78) valor_base -> LPAREN . expresion RPAREN
@@ -883,12 +900,12 @@ state 45
     (78) valor_base -> . LPAREN expresion RPAREN
     (79) valor_base -> . probabilidad_condicional
 
-    NOT             shift and go to state 43
-    LPAREN          shift and go to state 45
-    ID              shift and go to state 39
-    TRUE            shift and go to state 48
-    FALSE           shift and go to state 49
-    PROB            shift and go to state 51
+    NOT             shift and go to state 44
+    LPAREN          shift and go to state 46
+    ID              shift and go to state 40
+    TRUE            shift and go to state 49
+    FALSE           shift and go to state 50
+    PROB            shift and go to state 39
     SUB             shift and go to state 54
     ADD             shift and go to state 52
     INT             shift and go to state 58
@@ -896,18 +913,18 @@ state 45
     STRING          shift and go to state 60
 
     expresion                      shift and go to state 74
-    termino_comparacion            shift and go to state 41
-    termino_logico                 shift and go to state 42
-    factor_logico                  shift and go to state 44
-    termino_relacional             shift and go to state 46
-    probabilidad_condicional       shift and go to state 47
-    termino_aritmetico             shift and go to state 50
+    termino_comparacion            shift and go to state 42
+    termino_logico                 shift and go to state 43
+    factor_logico                  shift and go to state 45
+    termino_relacional             shift and go to state 47
+    probabilidad_condicional       shift and go to state 48
+    termino_aritmetico             shift and go to state 51
     factor_aritmetico              shift and go to state 53
     unario_aritmetico              shift and go to state 55
     potencia                       shift and go to state 56
     valor_base                     shift and go to state 57
 
-state 46
+state 47
 
     (46) factor_logico -> termino_relacional .
 
@@ -926,7 +943,7 @@ state 46
     AUTO_DISCOVER   reduce using rule 46 (factor_logico -> termino_relacional .)
 
 
-state 47
+state 48
 
     (47) factor_logico -> probabilidad_condicional .
     (79) valor_base -> probabilidad_condicional .
@@ -957,7 +974,7 @@ state 47
     GREATERTHAN     reduce using rule 79 (valor_base -> probabilidad_condicional .)
 
 
-state 48
+state 49
 
     (49) factor_logico -> TRUE .
     (74) valor_base -> TRUE .
@@ -988,7 +1005,7 @@ state 48
     GREATERTHAN     reduce using rule 74 (valor_base -> TRUE .)
 
 
-state 49
+state 50
 
     (50) factor_logico -> FALSE .
     (75) valor_base -> FALSE .
@@ -1019,7 +1036,7 @@ state 49
     GREATERTHAN     reduce using rule 75 (valor_base -> FALSE .)
 
 
-state 50
+state 51
 
     (51) termino_relacional -> termino_aritmetico . operador_relacional termino_aritmetico
     (60) termino_aritmetico -> termino_aritmetico . ADD factor_aritmetico
@@ -1042,14 +1059,6 @@ state 50
 
     operador_relacional            shift and go to state 75
 
-state 51
-
-    (52) probabilidad_condicional -> PROB . LPAREN expresion RPAREN
-    (53) probabilidad_condicional -> PROB . LPAREN expresion GIVEN expresion RPAREN
-
-    LPAREN          shift and go to state 84
-
-
 state 52
 
     (67) unario_aritmetico -> ADD . potencia
@@ -1070,15 +1079,15 @@ state 52
     INT             shift and go to state 58
     REAL            shift and go to state 59
     STRING          shift and go to state 60
-    TRUE            shift and go to state 86
-    FALSE           shift and go to state 87
-    ID              shift and go to state 88
-    LPAREN          shift and go to state 89
-    PROB            shift and go to state 51
+    TRUE            shift and go to state 85
+    FALSE           shift and go to state 86
+    ID              shift and go to state 87
+    LPAREN          shift and go to state 88
+    PROB            shift and go to state 39
 
-    potencia                       shift and go to state 85
+    potencia                       shift and go to state 84
     valor_base                     shift and go to state 57
-    probabilidad_condicional       shift and go to state 90
+    probabilidad_condicional       shift and go to state 89
 
 state 53
 
@@ -1107,8 +1116,8 @@ state 53
     GIVEN           reduce using rule 62 (termino_aritmetico -> factor_aritmetico .)
     GROUP           reduce using rule 62 (termino_aritmetico -> factor_aritmetico .)
     AUTO_DISCOVER   reduce using rule 62 (termino_aritmetico -> factor_aritmetico .)
-    MUL             shift and go to state 91
-    DIV             shift and go to state 92
+    MUL             shift and go to state 90
+    DIV             shift and go to state 91
 
 
 state 54
@@ -1131,15 +1140,15 @@ state 54
     INT             shift and go to state 58
     REAL            shift and go to state 59
     STRING          shift and go to state 60
-    TRUE            shift and go to state 86
-    FALSE           shift and go to state 87
-    ID              shift and go to state 88
-    LPAREN          shift and go to state 89
-    PROB            shift and go to state 51
+    TRUE            shift and go to state 85
+    FALSE           shift and go to state 86
+    ID              shift and go to state 87
+    LPAREN          shift and go to state 88
+    PROB            shift and go to state 39
 
-    potencia                       shift and go to state 93
+    potencia                       shift and go to state 92
     valor_base                     shift and go to state 57
-    probabilidad_condicional       shift and go to state 90
+    probabilidad_condicional       shift and go to state 89
 
 state 55
 
@@ -1204,7 +1213,7 @@ state 57
     (69) potencia -> valor_base . POW unario_aritmetico
     (70) potencia -> valor_base .
 
-    POW             shift and go to state 94
+    POW             shift and go to state 93
     MUL             reduce using rule 70 (potencia -> valor_base .)
     DIV             reduce using rule 70 (potencia -> valor_base .)
     ADD             reduce using rule 70 (potencia -> valor_base .)
@@ -1324,7 +1333,7 @@ state 61
 
     (9) importacion -> DATASET ID ASIG IMPORT FROM . STRING
 
-    STRING          shift and go to state 95
+    STRING          shift and go to state 94
 
 
 state 62
@@ -1332,7 +1341,7 @@ state 62
     (15) col_tipada -> ID . COLON tipo
     (16) col_tipada -> ID .
 
-    COLON           shift and go to state 96
+    COLON           shift and go to state 95
     COMMA           reduce using rule 16 (col_tipada -> ID .)
     FROM            reduce using rule 16 (col_tipada -> ID .)
 
@@ -1341,7 +1350,7 @@ state 63
 
     (10) preprocesamiento -> DATASET ID ASIG SELECT lista_cols_tipadas . FROM ID condicion_opt agrupacion_opt descubrimiento_opt
 
-    FROM            shift and go to state 97
+    FROM            shift and go to state 96
 
 
 state 64
@@ -1350,40 +1359,41 @@ state 64
     (14) lista_cols_tipadas -> col_tipada . COMMA lista_cols_tipadas
 
     FROM            reduce using rule 13 (lista_cols_tipadas -> col_tipada .)
-    COMMA           shift and go to state 98
+    COMMA           shift and go to state 97
 
 
 state 65
 
     (31) metrica_estatica -> MEAN LPAREN ID . DOT ID RPAREN
 
-    DOT             shift and go to state 99
+    DOT             shift and go to state 98
 
 
 state 66
 
     (32) metrica_estatica -> VAR LPAREN ID . DOT ID RPAREN
 
-    DOT             shift and go to state 100
+    DOT             shift and go to state 99
 
 
 state 67
 
     (33) metrica_estatica -> STD LPAREN ID . DOT ID RPAREN
 
-    DOT             shift and go to state 101
+    DOT             shift and go to state 100
 
 
 state 68
 
     (34) metrica_estatica -> CORRELATION LPAREN ID . DOT ID COMMA ID DOT ID RPAREN
 
-    DOT             shift and go to state 102
+    DOT             shift and go to state 101
 
 
 state 69
 
-    (28) declaracion_hecho -> FACT ID ASIG PROB LPAREN . expresion RPAREN
+    (52) probabilidad_condicional -> PROB LPAREN . expresion RPAREN
+    (53) probabilidad_condicional -> PROB LPAREN . expresion GIVEN expresion RPAREN
     (39) expresion -> . expresion OR termino_comparacion
     (40) expresion -> . termino_comparacion
     (41) termino_comparacion -> . termino_comparacion AND termino_logico
@@ -1420,25 +1430,25 @@ state 69
     (78) valor_base -> . LPAREN expresion RPAREN
     (79) valor_base -> . probabilidad_condicional
 
-    NOT             shift and go to state 43
-    LPAREN          shift and go to state 45
-    ID              shift and go to state 39
-    TRUE            shift and go to state 48
-    FALSE           shift and go to state 49
-    PROB            shift and go to state 51
+    NOT             shift and go to state 44
+    LPAREN          shift and go to state 46
+    ID              shift and go to state 40
+    TRUE            shift and go to state 49
+    FALSE           shift and go to state 50
+    PROB            shift and go to state 39
     SUB             shift and go to state 54
     ADD             shift and go to state 52
     INT             shift and go to state 58
     REAL            shift and go to state 59
     STRING          shift and go to state 60
 
-    expresion                      shift and go to state 103
-    termino_comparacion            shift and go to state 41
-    termino_logico                 shift and go to state 42
-    factor_logico                  shift and go to state 44
-    termino_relacional             shift and go to state 46
-    probabilidad_condicional       shift and go to state 47
-    termino_aritmetico             shift and go to state 50
+    expresion                      shift and go to state 102
+    termino_comparacion            shift and go to state 42
+    termino_logico                 shift and go to state 43
+    factor_logico                  shift and go to state 45
+    termino_relacional             shift and go to state 47
+    probabilidad_condicional       shift and go to state 48
+    termino_aritmetico             shift and go to state 51
     factor_aritmetico              shift and go to state 53
     unario_aritmetico              shift and go to state 55
     potencia                       shift and go to state 56
@@ -1448,7 +1458,7 @@ state 70
 
     (77) valor_base -> ID DOT . ID
 
-    ID              shift and go to state 104
+    ID              shift and go to state 103
 
 
 state 71
@@ -1488,24 +1498,24 @@ state 71
     (78) valor_base -> . LPAREN expresion RPAREN
     (79) valor_base -> . probabilidad_condicional
 
-    NOT             shift and go to state 43
-    LPAREN          shift and go to state 45
-    ID              shift and go to state 39
-    TRUE            shift and go to state 48
-    FALSE           shift and go to state 49
-    PROB            shift and go to state 51
+    NOT             shift and go to state 44
+    LPAREN          shift and go to state 46
+    ID              shift and go to state 40
+    TRUE            shift and go to state 49
+    FALSE           shift and go to state 50
+    PROB            shift and go to state 39
     SUB             shift and go to state 54
     ADD             shift and go to state 52
     INT             shift and go to state 58
     REAL            shift and go to state 59
     STRING          shift and go to state 60
 
-    termino_comparacion            shift and go to state 105
-    termino_logico                 shift and go to state 42
-    factor_logico                  shift and go to state 44
-    termino_relacional             shift and go to state 46
-    probabilidad_condicional       shift and go to state 47
-    termino_aritmetico             shift and go to state 50
+    termino_comparacion            shift and go to state 104
+    termino_logico                 shift and go to state 43
+    factor_logico                  shift and go to state 45
+    termino_relacional             shift and go to state 47
+    probabilidad_condicional       shift and go to state 48
+    termino_aritmetico             shift and go to state 51
     factor_aritmetico              shift and go to state 53
     unario_aritmetico              shift and go to state 55
     potencia                       shift and go to state 56
@@ -1546,23 +1556,23 @@ state 72
     (78) valor_base -> . LPAREN expresion RPAREN
     (79) valor_base -> . probabilidad_condicional
 
-    NOT             shift and go to state 43
-    LPAREN          shift and go to state 45
-    ID              shift and go to state 39
-    TRUE            shift and go to state 48
-    FALSE           shift and go to state 49
-    PROB            shift and go to state 51
+    NOT             shift and go to state 44
+    LPAREN          shift and go to state 46
+    ID              shift and go to state 40
+    TRUE            shift and go to state 49
+    FALSE           shift and go to state 50
+    PROB            shift and go to state 39
     SUB             shift and go to state 54
     ADD             shift and go to state 52
     INT             shift and go to state 58
     REAL            shift and go to state 59
     STRING          shift and go to state 60
 
-    termino_logico                 shift and go to state 106
-    factor_logico                  shift and go to state 44
-    termino_relacional             shift and go to state 46
-    probabilidad_condicional       shift and go to state 47
-    termino_aritmetico             shift and go to state 50
+    termino_logico                 shift and go to state 105
+    factor_logico                  shift and go to state 45
+    termino_relacional             shift and go to state 47
+    probabilidad_condicional       shift and go to state 48
+    termino_aritmetico             shift and go to state 51
     factor_aritmetico              shift and go to state 53
     unario_aritmetico              shift and go to state 55
     potencia                       shift and go to state 56
@@ -1593,7 +1603,7 @@ state 74
     (78) valor_base -> LPAREN expresion . RPAREN
     (39) expresion -> expresion . OR termino_comparacion
 
-    RPAREN          shift and go to state 107
+    RPAREN          shift and go to state 106
     OR              shift and go to state 71
 
 
@@ -1628,18 +1638,18 @@ state 75
     INT             shift and go to state 58
     REAL            shift and go to state 59
     STRING          shift and go to state 60
-    TRUE            shift and go to state 86
-    FALSE           shift and go to state 87
-    ID              shift and go to state 88
-    LPAREN          shift and go to state 89
-    PROB            shift and go to state 51
+    TRUE            shift and go to state 85
+    FALSE           shift and go to state 86
+    ID              shift and go to state 87
+    LPAREN          shift and go to state 88
+    PROB            shift and go to state 39
 
-    termino_aritmetico             shift and go to state 108
+    termino_aritmetico             shift and go to state 107
     factor_aritmetico              shift and go to state 53
     unario_aritmetico              shift and go to state 55
     potencia                       shift and go to state 56
     valor_base                     shift and go to state 57
-    probabilidad_condicional       shift and go to state 90
+    probabilidad_condicional       shift and go to state 89
 
 state 76
 
@@ -1669,17 +1679,17 @@ state 76
     INT             shift and go to state 58
     REAL            shift and go to state 59
     STRING          shift and go to state 60
-    TRUE            shift and go to state 86
-    FALSE           shift and go to state 87
-    ID              shift and go to state 88
-    LPAREN          shift and go to state 89
-    PROB            shift and go to state 51
+    TRUE            shift and go to state 85
+    FALSE           shift and go to state 86
+    ID              shift and go to state 87
+    LPAREN          shift and go to state 88
+    PROB            shift and go to state 39
 
-    factor_aritmetico              shift and go to state 109
+    factor_aritmetico              shift and go to state 108
     unario_aritmetico              shift and go to state 55
     potencia                       shift and go to state 56
     valor_base                     shift and go to state 57
-    probabilidad_condicional       shift and go to state 90
+    probabilidad_condicional       shift and go to state 89
 
 state 77
 
@@ -1709,17 +1719,17 @@ state 77
     INT             shift and go to state 58
     REAL            shift and go to state 59
     STRING          shift and go to state 60
-    TRUE            shift and go to state 86
-    FALSE           shift and go to state 87
-    ID              shift and go to state 88
-    LPAREN          shift and go to state 89
-    PROB            shift and go to state 51
+    TRUE            shift and go to state 85
+    FALSE           shift and go to state 86
+    ID              shift and go to state 87
+    LPAREN          shift and go to state 88
+    PROB            shift and go to state 39
 
-    factor_aritmetico              shift and go to state 110
+    factor_aritmetico              shift and go to state 109
     unario_aritmetico              shift and go to state 55
     potencia                       shift and go to state 56
     valor_base                     shift and go to state 57
-    probabilidad_condicional       shift and go to state 90
+    probabilidad_condicional       shift and go to state 89
 
 state 78
 
@@ -1819,70 +1829,6 @@ state 83
 
 state 84
 
-    (52) probabilidad_condicional -> PROB LPAREN . expresion RPAREN
-    (53) probabilidad_condicional -> PROB LPAREN . expresion GIVEN expresion RPAREN
-    (39) expresion -> . expresion OR termino_comparacion
-    (40) expresion -> . termino_comparacion
-    (41) termino_comparacion -> . termino_comparacion AND termino_logico
-    (42) termino_comparacion -> . termino_logico
-    (43) termino_logico -> . NOT factor_logico
-    (44) termino_logico -> . factor_logico
-    (45) factor_logico -> . LPAREN expresion RPAREN
-    (46) factor_logico -> . termino_relacional
-    (47) factor_logico -> . probabilidad_condicional
-    (48) factor_logico -> . ID
-    (49) factor_logico -> . TRUE
-    (50) factor_logico -> . FALSE
-    (51) termino_relacional -> . termino_aritmetico operador_relacional termino_aritmetico
-    (52) probabilidad_condicional -> . PROB LPAREN expresion RPAREN
-    (53) probabilidad_condicional -> . PROB LPAREN expresion GIVEN expresion RPAREN
-    (60) termino_aritmetico -> . termino_aritmetico ADD factor_aritmetico
-    (61) termino_aritmetico -> . termino_aritmetico SUB factor_aritmetico
-    (62) termino_aritmetico -> . factor_aritmetico
-    (63) factor_aritmetico -> . factor_aritmetico MUL unario_aritmetico
-    (64) factor_aritmetico -> . factor_aritmetico DIV unario_aritmetico
-    (65) factor_aritmetico -> . unario_aritmetico
-    (66) unario_aritmetico -> . SUB potencia
-    (67) unario_aritmetico -> . ADD potencia
-    (68) unario_aritmetico -> . potencia
-    (69) potencia -> . valor_base POW unario_aritmetico
-    (70) potencia -> . valor_base
-    (71) valor_base -> . INT
-    (72) valor_base -> . REAL
-    (73) valor_base -> . STRING
-    (74) valor_base -> . TRUE
-    (75) valor_base -> . FALSE
-    (76) valor_base -> . ID
-    (77) valor_base -> . ID DOT ID
-    (78) valor_base -> . LPAREN expresion RPAREN
-    (79) valor_base -> . probabilidad_condicional
-
-    NOT             shift and go to state 43
-    LPAREN          shift and go to state 45
-    ID              shift and go to state 39
-    TRUE            shift and go to state 48
-    FALSE           shift and go to state 49
-    PROB            shift and go to state 51
-    SUB             shift and go to state 54
-    ADD             shift and go to state 52
-    INT             shift and go to state 58
-    REAL            shift and go to state 59
-    STRING          shift and go to state 60
-
-    expresion                      shift and go to state 111
-    termino_comparacion            shift and go to state 41
-    termino_logico                 shift and go to state 42
-    factor_logico                  shift and go to state 44
-    termino_relacional             shift and go to state 46
-    probabilidad_condicional       shift and go to state 47
-    termino_aritmetico             shift and go to state 50
-    factor_aritmetico              shift and go to state 53
-    unario_aritmetico              shift and go to state 55
-    potencia                       shift and go to state 56
-    valor_base                     shift and go to state 57
-
-state 85
-
     (67) unario_aritmetico -> ADD potencia .
 
     MUL             reduce using rule 67 (unario_aritmetico -> ADD potencia .)
@@ -1910,7 +1856,7 @@ state 85
     AUTO_DISCOVER   reduce using rule 67 (unario_aritmetico -> ADD potencia .)
 
 
-state 86
+state 85
 
     (74) valor_base -> TRUE .
 
@@ -1940,7 +1886,7 @@ state 86
     AUTO_DISCOVER   reduce using rule 74 (valor_base -> TRUE .)
 
 
-state 87
+state 86
 
     (75) valor_base -> FALSE .
 
@@ -1970,7 +1916,7 @@ state 87
     AUTO_DISCOVER   reduce using rule 75 (valor_base -> FALSE .)
 
 
-state 88
+state 87
 
     (76) valor_base -> ID .
     (77) valor_base -> ID . DOT ID
@@ -2002,7 +1948,7 @@ state 88
     DOT             shift and go to state 70
 
 
-state 89
+state 88
 
     (78) valor_base -> LPAREN . expresion RPAREN
     (39) expresion -> . expresion OR termino_comparacion
@@ -2041,31 +1987,31 @@ state 89
     (78) valor_base -> . LPAREN expresion RPAREN
     (79) valor_base -> . probabilidad_condicional
 
-    NOT             shift and go to state 43
-    LPAREN          shift and go to state 45
-    ID              shift and go to state 39
-    TRUE            shift and go to state 48
-    FALSE           shift and go to state 49
-    PROB            shift and go to state 51
+    NOT             shift and go to state 44
+    LPAREN          shift and go to state 46
+    ID              shift and go to state 40
+    TRUE            shift and go to state 49
+    FALSE           shift and go to state 50
+    PROB            shift and go to state 39
     SUB             shift and go to state 54
     ADD             shift and go to state 52
     INT             shift and go to state 58
     REAL            shift and go to state 59
     STRING          shift and go to state 60
 
-    expresion                      shift and go to state 112
-    termino_comparacion            shift and go to state 41
-    termino_logico                 shift and go to state 42
-    factor_logico                  shift and go to state 44
-    termino_relacional             shift and go to state 46
-    probabilidad_condicional       shift and go to state 47
-    termino_aritmetico             shift and go to state 50
+    expresion                      shift and go to state 110
+    termino_comparacion            shift and go to state 42
+    termino_logico                 shift and go to state 43
+    factor_logico                  shift and go to state 45
+    termino_relacional             shift and go to state 47
+    probabilidad_condicional       shift and go to state 48
+    termino_aritmetico             shift and go to state 51
     factor_aritmetico              shift and go to state 53
     unario_aritmetico              shift and go to state 55
     potencia                       shift and go to state 56
     valor_base                     shift and go to state 57
 
-state 90
+state 89
 
     (79) valor_base -> probabilidad_condicional .
 
@@ -2095,7 +2041,7 @@ state 90
     AUTO_DISCOVER   reduce using rule 79 (valor_base -> probabilidad_condicional .)
 
 
-state 91
+state 90
 
     (63) factor_aritmetico -> factor_aritmetico MUL . unario_aritmetico
     (66) unario_aritmetico -> . SUB potencia
@@ -2120,18 +2066,18 @@ state 91
     INT             shift and go to state 58
     REAL            shift and go to state 59
     STRING          shift and go to state 60
-    TRUE            shift and go to state 86
-    FALSE           shift and go to state 87
-    ID              shift and go to state 88
-    LPAREN          shift and go to state 89
-    PROB            shift and go to state 51
+    TRUE            shift and go to state 85
+    FALSE           shift and go to state 86
+    ID              shift and go to state 87
+    LPAREN          shift and go to state 88
+    PROB            shift and go to state 39
 
-    unario_aritmetico              shift and go to state 113
+    unario_aritmetico              shift and go to state 111
     potencia                       shift and go to state 56
     valor_base                     shift and go to state 57
-    probabilidad_condicional       shift and go to state 90
+    probabilidad_condicional       shift and go to state 89
 
-state 92
+state 91
 
     (64) factor_aritmetico -> factor_aritmetico DIV . unario_aritmetico
     (66) unario_aritmetico -> . SUB potencia
@@ -2156,18 +2102,18 @@ state 92
     INT             shift and go to state 58
     REAL            shift and go to state 59
     STRING          shift and go to state 60
-    TRUE            shift and go to state 86
-    FALSE           shift and go to state 87
-    ID              shift and go to state 88
-    LPAREN          shift and go to state 89
-    PROB            shift and go to state 51
+    TRUE            shift and go to state 85
+    FALSE           shift and go to state 86
+    ID              shift and go to state 87
+    LPAREN          shift and go to state 88
+    PROB            shift and go to state 39
 
-    unario_aritmetico              shift and go to state 114
+    unario_aritmetico              shift and go to state 112
     potencia                       shift and go to state 56
     valor_base                     shift and go to state 57
-    probabilidad_condicional       shift and go to state 90
+    probabilidad_condicional       shift and go to state 89
 
-state 93
+state 92
 
     (66) unario_aritmetico -> SUB potencia .
 
@@ -2196,7 +2142,7 @@ state 93
     AUTO_DISCOVER   reduce using rule 66 (unario_aritmetico -> SUB potencia .)
 
 
-state 94
+state 93
 
     (69) potencia -> valor_base POW . unario_aritmetico
     (66) unario_aritmetico -> . SUB potencia
@@ -2221,18 +2167,18 @@ state 94
     INT             shift and go to state 58
     REAL            shift and go to state 59
     STRING          shift and go to state 60
-    TRUE            shift and go to state 86
-    FALSE           shift and go to state 87
-    ID              shift and go to state 88
-    LPAREN          shift and go to state 89
-    PROB            shift and go to state 51
+    TRUE            shift and go to state 85
+    FALSE           shift and go to state 86
+    ID              shift and go to state 87
+    LPAREN          shift and go to state 88
+    PROB            shift and go to state 39
 
     valor_base                     shift and go to state 57
-    unario_aritmetico              shift and go to state 115
+    unario_aritmetico              shift and go to state 113
     potencia                       shift and go to state 56
-    probabilidad_condicional       shift and go to state 90
+    probabilidad_condicional       shift and go to state 89
 
-state 95
+state 94
 
     (9) importacion -> DATASET ID ASIG IMPORT FROM STRING .
 
@@ -2245,7 +2191,7 @@ state 95
     $end            reduce using rule 9 (importacion -> DATASET ID ASIG IMPORT FROM STRING .)
 
 
-state 96
+state 95
 
     (15) col_tipada -> ID COLON . tipo
     (17) tipo -> . TYPE_INT
@@ -2253,21 +2199,21 @@ state 96
     (19) tipo -> . TYPE_STRING
     (20) tipo -> . TYPE_BOOL
 
-    TYPE_INT        shift and go to state 117
-    TYPE_REAL       shift and go to state 118
-    TYPE_STRING     shift and go to state 119
-    TYPE_BOOL       shift and go to state 120
+    TYPE_INT        shift and go to state 115
+    TYPE_REAL       shift and go to state 116
+    TYPE_STRING     shift and go to state 117
+    TYPE_BOOL       shift and go to state 118
 
-    tipo                           shift and go to state 116
+    tipo                           shift and go to state 114
 
-state 97
+state 96
 
     (10) preprocesamiento -> DATASET ID ASIG SELECT lista_cols_tipadas FROM . ID condicion_opt agrupacion_opt descubrimiento_opt
 
-    ID              shift and go to state 121
+    ID              shift and go to state 119
 
 
-state 98
+state 97
 
     (14) lista_cols_tipadas -> col_tipada COMMA . lista_cols_tipadas
     (13) lista_cols_tipadas -> . col_tipada
@@ -2278,46 +2224,48 @@ state 98
     ID              shift and go to state 62
 
     col_tipada                     shift and go to state 64
-    lista_cols_tipadas             shift and go to state 122
+    lista_cols_tipadas             shift and go to state 120
 
-state 99
+state 98
 
     (31) metrica_estatica -> MEAN LPAREN ID DOT . ID RPAREN
 
-    ID              shift and go to state 123
+    ID              shift and go to state 121
+
+
+state 99
+
+    (32) metrica_estatica -> VAR LPAREN ID DOT . ID RPAREN
+
+    ID              shift and go to state 122
 
 
 state 100
 
-    (32) metrica_estatica -> VAR LPAREN ID DOT . ID RPAREN
+    (33) metrica_estatica -> STD LPAREN ID DOT . ID RPAREN
 
-    ID              shift and go to state 124
+    ID              shift and go to state 123
 
 
 state 101
 
-    (33) metrica_estatica -> STD LPAREN ID DOT . ID RPAREN
+    (34) metrica_estatica -> CORRELATION LPAREN ID DOT . ID COMMA ID DOT ID RPAREN
 
-    ID              shift and go to state 125
+    ID              shift and go to state 124
 
 
 state 102
 
-    (34) metrica_estatica -> CORRELATION LPAREN ID DOT . ID COMMA ID DOT ID RPAREN
-
-    ID              shift and go to state 126
-
-
-state 103
-
-    (28) declaracion_hecho -> FACT ID ASIG PROB LPAREN expresion . RPAREN
+    (52) probabilidad_condicional -> PROB LPAREN expresion . RPAREN
+    (53) probabilidad_condicional -> PROB LPAREN expresion . GIVEN expresion RPAREN
     (39) expresion -> expresion . OR termino_comparacion
 
-    RPAREN          shift and go to state 127
+    RPAREN          shift and go to state 125
+    GIVEN           shift and go to state 126
     OR              shift and go to state 71
 
 
-state 104
+state 103
 
     (77) valor_base -> ID DOT ID .
 
@@ -2347,7 +2295,7 @@ state 104
     AUTO_DISCOVER   reduce using rule 77 (valor_base -> ID DOT ID .)
 
 
-state 105
+state 104
 
     (39) expresion -> expresion OR termino_comparacion .
     (41) termino_comparacion -> termino_comparacion . AND termino_logico
@@ -2367,7 +2315,7 @@ state 105
     AND             shift and go to state 72
 
 
-state 106
+state 105
 
     (41) termino_comparacion -> termino_comparacion AND termino_logico .
 
@@ -2386,7 +2334,7 @@ state 106
     AUTO_DISCOVER   reduce using rule 41 (termino_comparacion -> termino_comparacion AND termino_logico .)
 
 
-state 107
+state 106
 
     (45) factor_logico -> LPAREN expresion RPAREN .
     (78) valor_base -> LPAREN expresion RPAREN .
@@ -2417,7 +2365,7 @@ state 107
     GREATERTHAN     reduce using rule 78 (valor_base -> LPAREN expresion RPAREN .)
 
 
-state 108
+state 107
 
     (51) termino_relacional -> termino_aritmetico operador_relacional termino_aritmetico .
     (60) termino_aritmetico -> termino_aritmetico . ADD factor_aritmetico
@@ -2440,7 +2388,7 @@ state 108
     SUB             shift and go to state 77
 
 
-state 109
+state 108
 
     (60) termino_aritmetico -> termino_aritmetico ADD factor_aritmetico .
     (63) factor_aritmetico -> factor_aritmetico . MUL unario_aritmetico
@@ -2467,11 +2415,11 @@ state 109
     GIVEN           reduce using rule 60 (termino_aritmetico -> termino_aritmetico ADD factor_aritmetico .)
     GROUP           reduce using rule 60 (termino_aritmetico -> termino_aritmetico ADD factor_aritmetico .)
     AUTO_DISCOVER   reduce using rule 60 (termino_aritmetico -> termino_aritmetico ADD factor_aritmetico .)
-    MUL             shift and go to state 91
-    DIV             shift and go to state 92
+    MUL             shift and go to state 90
+    DIV             shift and go to state 91
 
 
-state 110
+state 109
 
     (61) termino_aritmetico -> termino_aritmetico SUB factor_aritmetico .
     (63) factor_aritmetico -> factor_aritmetico . MUL unario_aritmetico
@@ -2498,31 +2446,20 @@ state 110
     GIVEN           reduce using rule 61 (termino_aritmetico -> termino_aritmetico SUB factor_aritmetico .)
     GROUP           reduce using rule 61 (termino_aritmetico -> termino_aritmetico SUB factor_aritmetico .)
     AUTO_DISCOVER   reduce using rule 61 (termino_aritmetico -> termino_aritmetico SUB factor_aritmetico .)
-    MUL             shift and go to state 91
-    DIV             shift and go to state 92
+    MUL             shift and go to state 90
+    DIV             shift and go to state 91
 
 
-state 111
-
-    (52) probabilidad_condicional -> PROB LPAREN expresion . RPAREN
-    (53) probabilidad_condicional -> PROB LPAREN expresion . GIVEN expresion RPAREN
-    (39) expresion -> expresion . OR termino_comparacion
-
-    RPAREN          shift and go to state 128
-    GIVEN           shift and go to state 129
-    OR              shift and go to state 71
-
-
-state 112
+state 110
 
     (78) valor_base -> LPAREN expresion . RPAREN
     (39) expresion -> expresion . OR termino_comparacion
 
-    RPAREN          shift and go to state 130
+    RPAREN          shift and go to state 127
     OR              shift and go to state 71
 
 
-state 113
+state 111
 
     (63) factor_aritmetico -> factor_aritmetico MUL unario_aritmetico .
 
@@ -2551,7 +2488,7 @@ state 113
     AUTO_DISCOVER   reduce using rule 63 (factor_aritmetico -> factor_aritmetico MUL unario_aritmetico .)
 
 
-state 114
+state 112
 
     (64) factor_aritmetico -> factor_aritmetico DIV unario_aritmetico .
 
@@ -2580,7 +2517,7 @@ state 114
     AUTO_DISCOVER   reduce using rule 64 (factor_aritmetico -> factor_aritmetico DIV unario_aritmetico .)
 
 
-state 115
+state 113
 
     (69) potencia -> valor_base POW unario_aritmetico .
 
@@ -2609,7 +2546,7 @@ state 115
     AUTO_DISCOVER   reduce using rule 69 (potencia -> valor_base POW unario_aritmetico .)
 
 
-state 116
+state 114
 
     (15) col_tipada -> ID COLON tipo .
 
@@ -2617,7 +2554,7 @@ state 116
     FROM            reduce using rule 15 (col_tipada -> ID COLON tipo .)
 
 
-state 117
+state 115
 
     (17) tipo -> TYPE_INT .
 
@@ -2625,7 +2562,7 @@ state 117
     FROM            reduce using rule 17 (tipo -> TYPE_INT .)
 
 
-state 118
+state 116
 
     (18) tipo -> TYPE_REAL .
 
@@ -2633,7 +2570,7 @@ state 118
     FROM            reduce using rule 18 (tipo -> TYPE_REAL .)
 
 
-state 119
+state 117
 
     (19) tipo -> TYPE_STRING .
 
@@ -2641,7 +2578,7 @@ state 119
     FROM            reduce using rule 19 (tipo -> TYPE_STRING .)
 
 
-state 120
+state 118
 
     (20) tipo -> TYPE_BOOL .
 
@@ -2649,14 +2586,14 @@ state 120
     FROM            reduce using rule 20 (tipo -> TYPE_BOOL .)
 
 
-state 121
+state 119
 
     (10) preprocesamiento -> DATASET ID ASIG SELECT lista_cols_tipadas FROM ID . condicion_opt agrupacion_opt descubrimiento_opt
     (21) condicion_opt -> . WHERE expresion
     (22) condicion_opt -> . empty
     (80) empty -> .
 
-    WHERE           shift and go to state 132
+    WHERE           shift and go to state 129
     GROUP           reduce using rule 80 (empty -> .)
     AUTO_DISCOVER   reduce using rule 80 (empty -> .)
     error           reduce using rule 80 (empty -> .)
@@ -2667,63 +2604,48 @@ state 121
     ID              reduce using rule 80 (empty -> .)
     $end            reduce using rule 80 (empty -> .)
 
-    condicion_opt                  shift and go to state 131
-    empty                          shift and go to state 133
+    condicion_opt                  shift and go to state 128
+    empty                          shift and go to state 130
 
-state 122
+state 120
 
     (14) lista_cols_tipadas -> col_tipada COMMA lista_cols_tipadas .
 
     FROM            reduce using rule 14 (lista_cols_tipadas -> col_tipada COMMA lista_cols_tipadas .)
 
 
-state 123
+state 121
 
     (31) metrica_estatica -> MEAN LPAREN ID DOT ID . RPAREN
 
-    RPAREN          shift and go to state 134
+    RPAREN          shift and go to state 131
+
+
+state 122
+
+    (32) metrica_estatica -> VAR LPAREN ID DOT ID . RPAREN
+
+    RPAREN          shift and go to state 132
+
+
+state 123
+
+    (33) metrica_estatica -> STD LPAREN ID DOT ID . RPAREN
+
+    RPAREN          shift and go to state 133
 
 
 state 124
 
-    (32) metrica_estatica -> VAR LPAREN ID DOT ID . RPAREN
+    (34) metrica_estatica -> CORRELATION LPAREN ID DOT ID . COMMA ID DOT ID RPAREN
 
-    RPAREN          shift and go to state 135
+    COMMA           shift and go to state 134
 
 
 state 125
 
-    (33) metrica_estatica -> STD LPAREN ID DOT ID . RPAREN
-
-    RPAREN          shift and go to state 136
-
-
-state 126
-
-    (34) metrica_estatica -> CORRELATION LPAREN ID DOT ID . COMMA ID DOT ID RPAREN
-
-    COMMA           shift and go to state 137
-
-
-state 127
-
-    (28) declaracion_hecho -> FACT ID ASIG PROB LPAREN expresion RPAREN .
-
-    error           reduce using rule 28 (declaracion_hecho -> FACT ID ASIG PROB LPAREN expresion RPAREN .)
-    DATASET         reduce using rule 28 (declaracion_hecho -> FACT ID ASIG PROB LPAREN expresion RPAREN .)
-    FACT            reduce using rule 28 (declaracion_hecho -> FACT ID ASIG PROB LPAREN expresion RPAREN .)
-    RULE            reduce using rule 28 (declaracion_hecho -> FACT ID ASIG PROB LPAREN expresion RPAREN .)
-    QUERY           reduce using rule 28 (declaracion_hecho -> FACT ID ASIG PROB LPAREN expresion RPAREN .)
-    ID              reduce using rule 28 (declaracion_hecho -> FACT ID ASIG PROB LPAREN expresion RPAREN .)
-    $end            reduce using rule 28 (declaracion_hecho -> FACT ID ASIG PROB LPAREN expresion RPAREN .)
-
-
-state 128
-
     (52) probabilidad_condicional -> PROB LPAREN expresion RPAREN .
 
-    AND             reduce using rule 52 (probabilidad_condicional -> PROB LPAREN expresion RPAREN .)
-    OR              reduce using rule 52 (probabilidad_condicional -> PROB LPAREN expresion RPAREN .)
     error           reduce using rule 52 (probabilidad_condicional -> PROB LPAREN expresion RPAREN .)
     DATASET         reduce using rule 52 (probabilidad_condicional -> PROB LPAREN expresion RPAREN .)
     FACT            reduce using rule 52 (probabilidad_condicional -> PROB LPAREN expresion RPAREN .)
@@ -2731,6 +2653,8 @@ state 128
     QUERY           reduce using rule 52 (probabilidad_condicional -> PROB LPAREN expresion RPAREN .)
     ID              reduce using rule 52 (probabilidad_condicional -> PROB LPAREN expresion RPAREN .)
     $end            reduce using rule 52 (probabilidad_condicional -> PROB LPAREN expresion RPAREN .)
+    AND             reduce using rule 52 (probabilidad_condicional -> PROB LPAREN expresion RPAREN .)
+    OR              reduce using rule 52 (probabilidad_condicional -> PROB LPAREN expresion RPAREN .)
     POW             reduce using rule 52 (probabilidad_condicional -> PROB LPAREN expresion RPAREN .)
     MUL             reduce using rule 52 (probabilidad_condicional -> PROB LPAREN expresion RPAREN .)
     DIV             reduce using rule 52 (probabilidad_condicional -> PROB LPAREN expresion RPAREN .)
@@ -2748,7 +2672,7 @@ state 128
     AUTO_DISCOVER   reduce using rule 52 (probabilidad_condicional -> PROB LPAREN expresion RPAREN .)
 
 
-state 129
+state 126
 
     (53) probabilidad_condicional -> PROB LPAREN expresion GIVEN . expresion RPAREN
     (39) expresion -> . expresion OR termino_comparacion
@@ -2787,31 +2711,31 @@ state 129
     (78) valor_base -> . LPAREN expresion RPAREN
     (79) valor_base -> . probabilidad_condicional
 
-    NOT             shift and go to state 43
-    LPAREN          shift and go to state 45
-    ID              shift and go to state 39
-    TRUE            shift and go to state 48
-    FALSE           shift and go to state 49
-    PROB            shift and go to state 51
+    NOT             shift and go to state 44
+    LPAREN          shift and go to state 46
+    ID              shift and go to state 40
+    TRUE            shift and go to state 49
+    FALSE           shift and go to state 50
+    PROB            shift and go to state 39
     SUB             shift and go to state 54
     ADD             shift and go to state 52
     INT             shift and go to state 58
     REAL            shift and go to state 59
     STRING          shift and go to state 60
 
-    expresion                      shift and go to state 138
-    termino_comparacion            shift and go to state 41
-    termino_logico                 shift and go to state 42
-    factor_logico                  shift and go to state 44
-    termino_relacional             shift and go to state 46
-    probabilidad_condicional       shift and go to state 47
-    termino_aritmetico             shift and go to state 50
+    expresion                      shift and go to state 135
+    termino_comparacion            shift and go to state 42
+    termino_logico                 shift and go to state 43
+    factor_logico                  shift and go to state 45
+    termino_relacional             shift and go to state 47
+    probabilidad_condicional       shift and go to state 48
+    termino_aritmetico             shift and go to state 51
     factor_aritmetico              shift and go to state 53
     unario_aritmetico              shift and go to state 55
     potencia                       shift and go to state 56
     valor_base                     shift and go to state 57
 
-state 130
+state 127
 
     (78) valor_base -> LPAREN expresion RPAREN .
 
@@ -2841,14 +2765,14 @@ state 130
     AUTO_DISCOVER   reduce using rule 78 (valor_base -> LPAREN expresion RPAREN .)
 
 
-state 131
+state 128
 
     (10) preprocesamiento -> DATASET ID ASIG SELECT lista_cols_tipadas FROM ID condicion_opt . agrupacion_opt descubrimiento_opt
     (23) agrupacion_opt -> . GROUP lista_ids
     (24) agrupacion_opt -> . empty
     (80) empty -> .
 
-    GROUP           shift and go to state 140
+    GROUP           shift and go to state 137
     AUTO_DISCOVER   reduce using rule 80 (empty -> .)
     error           reduce using rule 80 (empty -> .)
     DATASET         reduce using rule 80 (empty -> .)
@@ -2858,10 +2782,10 @@ state 131
     ID              reduce using rule 80 (empty -> .)
     $end            reduce using rule 80 (empty -> .)
 
-    agrupacion_opt                 shift and go to state 139
-    empty                          shift and go to state 141
+    agrupacion_opt                 shift and go to state 136
+    empty                          shift and go to state 138
 
-state 132
+state 129
 
     (21) condicion_opt -> WHERE . expresion
     (39) expresion -> . expresion OR termino_comparacion
@@ -2900,31 +2824,31 @@ state 132
     (78) valor_base -> . LPAREN expresion RPAREN
     (79) valor_base -> . probabilidad_condicional
 
-    NOT             shift and go to state 43
-    LPAREN          shift and go to state 45
-    ID              shift and go to state 39
-    TRUE            shift and go to state 48
-    FALSE           shift and go to state 49
-    PROB            shift and go to state 51
+    NOT             shift and go to state 44
+    LPAREN          shift and go to state 46
+    ID              shift and go to state 40
+    TRUE            shift and go to state 49
+    FALSE           shift and go to state 50
+    PROB            shift and go to state 39
     SUB             shift and go to state 54
     ADD             shift and go to state 52
     INT             shift and go to state 58
     REAL            shift and go to state 59
     STRING          shift and go to state 60
 
-    expresion                      shift and go to state 142
-    termino_comparacion            shift and go to state 41
-    termino_logico                 shift and go to state 42
-    factor_logico                  shift and go to state 44
-    termino_relacional             shift and go to state 46
-    probabilidad_condicional       shift and go to state 47
-    termino_aritmetico             shift and go to state 50
+    expresion                      shift and go to state 139
+    termino_comparacion            shift and go to state 42
+    termino_logico                 shift and go to state 43
+    factor_logico                  shift and go to state 45
+    termino_relacional             shift and go to state 47
+    probabilidad_condicional       shift and go to state 48
+    termino_aritmetico             shift and go to state 51
     factor_aritmetico              shift and go to state 53
     unario_aritmetico              shift and go to state 55
     potencia                       shift and go to state 56
     valor_base                     shift and go to state 57
 
-state 133
+state 130
 
     (22) condicion_opt -> empty .
 
@@ -2939,7 +2863,7 @@ state 133
     $end            reduce using rule 22 (condicion_opt -> empty .)
 
 
-state 134
+state 131
 
     (31) metrica_estatica -> MEAN LPAREN ID DOT ID RPAREN .
 
@@ -2952,7 +2876,7 @@ state 134
     $end            reduce using rule 31 (metrica_estatica -> MEAN LPAREN ID DOT ID RPAREN .)
 
 
-state 135
+state 132
 
     (32) metrica_estatica -> VAR LPAREN ID DOT ID RPAREN .
 
@@ -2965,7 +2889,7 @@ state 135
     $end            reduce using rule 32 (metrica_estatica -> VAR LPAREN ID DOT ID RPAREN .)
 
 
-state 136
+state 133
 
     (33) metrica_estatica -> STD LPAREN ID DOT ID RPAREN .
 
@@ -2978,30 +2902,30 @@ state 136
     $end            reduce using rule 33 (metrica_estatica -> STD LPAREN ID DOT ID RPAREN .)
 
 
-state 137
+state 134
 
     (34) metrica_estatica -> CORRELATION LPAREN ID DOT ID COMMA . ID DOT ID RPAREN
 
-    ID              shift and go to state 143
+    ID              shift and go to state 140
 
 
-state 138
+state 135
 
     (53) probabilidad_condicional -> PROB LPAREN expresion GIVEN expresion . RPAREN
     (39) expresion -> expresion . OR termino_comparacion
 
-    RPAREN          shift and go to state 144
+    RPAREN          shift and go to state 141
     OR              shift and go to state 71
 
 
-state 139
+state 136
 
     (10) preprocesamiento -> DATASET ID ASIG SELECT lista_cols_tipadas FROM ID condicion_opt agrupacion_opt . descubrimiento_opt
     (25) descubrimiento_opt -> . AUTO_DISCOVER lista_hechos
     (26) descubrimiento_opt -> . empty
     (80) empty -> .
 
-    AUTO_DISCOVER   shift and go to state 146
+    AUTO_DISCOVER   shift and go to state 143
     error           reduce using rule 80 (empty -> .)
     DATASET         reduce using rule 80 (empty -> .)
     FACT            reduce using rule 80 (empty -> .)
@@ -3010,20 +2934,20 @@ state 139
     ID              reduce using rule 80 (empty -> .)
     $end            reduce using rule 80 (empty -> .)
 
-    descubrimiento_opt             shift and go to state 145
-    empty                          shift and go to state 147
+    descubrimiento_opt             shift and go to state 142
+    empty                          shift and go to state 144
 
-state 140
+state 137
 
     (23) agrupacion_opt -> GROUP . lista_ids
     (11) lista_ids -> . ID
     (12) lista_ids -> . ID COMMA lista_ids
 
-    ID              shift and go to state 149
+    ID              shift and go to state 146
 
-    lista_ids                      shift and go to state 148
+    lista_ids                      shift and go to state 145
 
-state 141
+state 138
 
     (24) agrupacion_opt -> empty .
 
@@ -3037,7 +2961,7 @@ state 141
     $end            reduce using rule 24 (agrupacion_opt -> empty .)
 
 
-state 142
+state 139
 
     (21) condicion_opt -> WHERE expresion .
     (39) expresion -> expresion . OR termino_comparacion
@@ -3054,19 +2978,17 @@ state 142
     OR              shift and go to state 71
 
 
-state 143
+state 140
 
     (34) metrica_estatica -> CORRELATION LPAREN ID DOT ID COMMA ID . DOT ID RPAREN
 
-    DOT             shift and go to state 150
+    DOT             shift and go to state 147
 
 
-state 144
+state 141
 
     (53) probabilidad_condicional -> PROB LPAREN expresion GIVEN expresion RPAREN .
 
-    AND             reduce using rule 53 (probabilidad_condicional -> PROB LPAREN expresion GIVEN expresion RPAREN .)
-    OR              reduce using rule 53 (probabilidad_condicional -> PROB LPAREN expresion GIVEN expresion RPAREN .)
     error           reduce using rule 53 (probabilidad_condicional -> PROB LPAREN expresion GIVEN expresion RPAREN .)
     DATASET         reduce using rule 53 (probabilidad_condicional -> PROB LPAREN expresion GIVEN expresion RPAREN .)
     FACT            reduce using rule 53 (probabilidad_condicional -> PROB LPAREN expresion GIVEN expresion RPAREN .)
@@ -3074,6 +2996,8 @@ state 144
     QUERY           reduce using rule 53 (probabilidad_condicional -> PROB LPAREN expresion GIVEN expresion RPAREN .)
     ID              reduce using rule 53 (probabilidad_condicional -> PROB LPAREN expresion GIVEN expresion RPAREN .)
     $end            reduce using rule 53 (probabilidad_condicional -> PROB LPAREN expresion GIVEN expresion RPAREN .)
+    AND             reduce using rule 53 (probabilidad_condicional -> PROB LPAREN expresion GIVEN expresion RPAREN .)
+    OR              reduce using rule 53 (probabilidad_condicional -> PROB LPAREN expresion GIVEN expresion RPAREN .)
     POW             reduce using rule 53 (probabilidad_condicional -> PROB LPAREN expresion GIVEN expresion RPAREN .)
     MUL             reduce using rule 53 (probabilidad_condicional -> PROB LPAREN expresion GIVEN expresion RPAREN .)
     DIV             reduce using rule 53 (probabilidad_condicional -> PROB LPAREN expresion GIVEN expresion RPAREN .)
@@ -3091,7 +3015,7 @@ state 144
     AUTO_DISCOVER   reduce using rule 53 (probabilidad_condicional -> PROB LPAREN expresion GIVEN expresion RPAREN .)
 
 
-state 145
+state 142
 
     (10) preprocesamiento -> DATASET ID ASIG SELECT lista_cols_tipadas FROM ID condicion_opt agrupacion_opt descubrimiento_opt .
 
@@ -3104,16 +3028,16 @@ state 145
     $end            reduce using rule 10 (preprocesamiento -> DATASET ID ASIG SELECT lista_cols_tipadas FROM ID condicion_opt agrupacion_opt descubrimiento_opt .)
 
 
-state 146
+state 143
 
     (25) descubrimiento_opt -> AUTO_DISCOVER . lista_hechos
     (27) lista_hechos -> . DATASET LPAREN ID RPAREN WHERE CORRELATION operador_relacional REAL
 
-    DATASET         shift and go to state 152
+    DATASET         shift and go to state 149
 
-    lista_hechos                   shift and go to state 151
+    lista_hechos                   shift and go to state 148
 
-state 147
+state 144
 
     (26) descubrimiento_opt -> empty .
 
@@ -3126,7 +3050,7 @@ state 147
     $end            reduce using rule 26 (descubrimiento_opt -> empty .)
 
 
-state 148
+state 145
 
     (23) agrupacion_opt -> GROUP lista_ids .
 
@@ -3140,7 +3064,7 @@ state 148
     $end            reduce using rule 23 (agrupacion_opt -> GROUP lista_ids .)
 
 
-state 149
+state 146
 
     (11) lista_ids -> ID .
     (12) lista_ids -> ID . COMMA lista_ids
@@ -3153,17 +3077,17 @@ state 149
     QUERY           reduce using rule 11 (lista_ids -> ID .)
     ID              reduce using rule 11 (lista_ids -> ID .)
     $end            reduce using rule 11 (lista_ids -> ID .)
-    COMMA           shift and go to state 153
+    COMMA           shift and go to state 150
 
 
-state 150
+state 147
 
     (34) metrica_estatica -> CORRELATION LPAREN ID DOT ID COMMA ID DOT . ID RPAREN
 
-    ID              shift and go to state 154
+    ID              shift and go to state 151
 
 
-state 151
+state 148
 
     (25) descubrimiento_opt -> AUTO_DISCOVER lista_hechos .
 
@@ -3176,38 +3100,38 @@ state 151
     $end            reduce using rule 25 (descubrimiento_opt -> AUTO_DISCOVER lista_hechos .)
 
 
-state 152
+state 149
 
     (27) lista_hechos -> DATASET . LPAREN ID RPAREN WHERE CORRELATION operador_relacional REAL
 
-    LPAREN          shift and go to state 155
+    LPAREN          shift and go to state 152
 
 
-state 153
+state 150
 
     (12) lista_ids -> ID COMMA . lista_ids
     (11) lista_ids -> . ID
     (12) lista_ids -> . ID COMMA lista_ids
 
-    ID              shift and go to state 149
+    ID              shift and go to state 146
 
-    lista_ids                      shift and go to state 156
+    lista_ids                      shift and go to state 153
 
-state 154
+state 151
 
     (34) metrica_estatica -> CORRELATION LPAREN ID DOT ID COMMA ID DOT ID . RPAREN
 
-    RPAREN          shift and go to state 157
+    RPAREN          shift and go to state 154
 
 
-state 155
+state 152
 
     (27) lista_hechos -> DATASET LPAREN . ID RPAREN WHERE CORRELATION operador_relacional REAL
 
-    ID              shift and go to state 158
+    ID              shift and go to state 155
 
 
-state 156
+state 153
 
     (12) lista_ids -> ID COMMA lista_ids .
 
@@ -3221,7 +3145,7 @@ state 156
     $end            reduce using rule 12 (lista_ids -> ID COMMA lista_ids .)
 
 
-state 157
+state 154
 
     (34) metrica_estatica -> CORRELATION LPAREN ID DOT ID COMMA ID DOT ID RPAREN .
 
@@ -3234,28 +3158,28 @@ state 157
     $end            reduce using rule 34 (metrica_estatica -> CORRELATION LPAREN ID DOT ID COMMA ID DOT ID RPAREN .)
 
 
-state 158
+state 155
 
     (27) lista_hechos -> DATASET LPAREN ID . RPAREN WHERE CORRELATION operador_relacional REAL
 
-    RPAREN          shift and go to state 159
+    RPAREN          shift and go to state 156
 
 
-state 159
+state 156
 
     (27) lista_hechos -> DATASET LPAREN ID RPAREN . WHERE CORRELATION operador_relacional REAL
 
-    WHERE           shift and go to state 160
+    WHERE           shift and go to state 157
 
 
-state 160
+state 157
 
     (27) lista_hechos -> DATASET LPAREN ID RPAREN WHERE . CORRELATION operador_relacional REAL
 
-    CORRELATION     shift and go to state 161
+    CORRELATION     shift and go to state 158
 
 
-state 161
+state 158
 
     (27) lista_hechos -> DATASET LPAREN ID RPAREN WHERE CORRELATION . operador_relacional REAL
     (54) operador_relacional -> . EQ
@@ -3272,16 +3196,16 @@ state 161
     LESSTHAN        shift and go to state 82
     GREATERTHAN     shift and go to state 83
 
-    operador_relacional            shift and go to state 162
+    operador_relacional            shift and go to state 159
 
-state 162
+state 159
 
     (27) lista_hechos -> DATASET LPAREN ID RPAREN WHERE CORRELATION operador_relacional . REAL
 
-    REAL            shift and go to state 163
+    REAL            shift and go to state 160
 
 
-state 163
+state 160
 
     (27) lista_hechos -> DATASET LPAREN ID RPAREN WHERE CORRELATION operador_relacional REAL .
 

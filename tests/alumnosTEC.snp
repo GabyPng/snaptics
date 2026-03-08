@@ -21,13 +21,13 @@ fact promedio_muy_bajo = P(promedio_parcial < 60)
 
 fact p_reprobacion_dada_asistencia_baja =
     P(
-        promedio_parcial < 60 or
+        promedio_parcial < 60 given
         asistencia_porcentaje < 60
     )
 
 fact p_reprobacion_dada_tareas_bajas =
     P(
-        promedio_parcial < 60 or
+        promedio_parcial < 60 given
         calificacion_tareas < 70
     )
 

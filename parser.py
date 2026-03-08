@@ -203,12 +203,12 @@ def p_lista_hechos(p):
                    line=p.lineno(1))
 
 def p_declaracion_hecho(p):
-    '''declaracion_hecho : FACT ID ASIG PROB LPAREN expresion RPAREN
+    '''declaracion_hecho : FACT ID ASIG probabilidad_condicional
                          | declaracion_metrica'''
     if len(p) > 2:
         p[0] = ASTNode('DeclaracionHecho',
                        fact_id=p[2],
-                       probabilidad=p[6],
+                       probabilidad=p[4],
                        line=p.lineno(1))
         # Registrar símbolo
         p.parser.symbol_table.add(p[2], None, None, p.lineno(2))
