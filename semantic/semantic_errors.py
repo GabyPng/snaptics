@@ -8,6 +8,7 @@ class SemanticErrorCode:
     TYPE_MISMATCH        = ("SEM-201", "Tipos incompatibles")
     INVALID_LOGICAL_TYPE = ("SEM-202", "Operador lógico con tipo inválido")
     INVALID_COMPARISON   = ("SEM-203", "Comparación inválida")
+    MISSING_COLUMN_TYPE  = ("SEM-204", "Tipo de columna no declarado")
 
     # SEM-300: errores de datasets
     DATASET_SOURCE_NOT_FOUND = ("SEM-301", "Dataset fuente inexistente")

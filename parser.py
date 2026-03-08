@@ -133,7 +133,7 @@ def p_importacion(p):
     p.parser.symbol_table.add(p[2], None, None, p.lineno(2))
 
 def p_preprocesamiento_completo(p):
-    '''preprocesamiento : DATASET ID ASIG SELECT lista_ids FROM ID condicion_opt agrupacion_opt descubrimiento_opt'''
+    '''preprocesamiento : DATASET ID ASIG SELECT lista_cols_tipadas FROM ID condicion_opt agrupacion_opt descubrimiento_opt'''
     p[0] = ASTNode('Preprocesamiento',
                    dataset_id=p[2],
                    columnas=p[5],
@@ -142,8 +142,11 @@ def p_preprocesamiento_completo(p):
                    agrupacion=p[9],
                    descubrimiento=p[10],
                    line=p.lineno(1))
-    # Registrar símbolo
-    p.parser.symbol_table.add(p[2], None, None, p.lineno(2))
+    # Registrar símbolo del dataset
+    p.parser.symbol_table.add(p[2], 'dataset', 'dataset', p.lineno(2))
+    # Registrar cada columna con su tipo
+    for col_name, col_type in p[5]:
+        p.parser.symbol_table.add(col_name, 'column', col_type, p.lineno(2))
 
 def p_lista_ids(p):
     '''lista_ids : ID
@@ -152,6 +155,29 @@ def p_lista_ids(p):
         p[0] = [p[1]]
     else:
         p[0] = [p[1]] + p[3]
+
+def p_lista_cols_tipadas(p):
+    '''lista_cols_tipadas : col_tipada
+                          | col_tipada COMMA lista_cols_tipadas'''
+    if len(p) == 2:
+        p[0] = [p[1]]
+    else:
+        p[0] = [p[1]] + p[3]
+
+def p_col_tipada(p):
+    '''col_tipada : ID COLON tipo
+                  | ID'''
+    if len(p) == 4:
+        p[0] = (p[1], p[3])
+    else:
+        p[0] = (p[1], None)
+
+def p_tipo(p):
+    '''tipo : TYPE_INT
+            | TYPE_REAL
+            | TYPE_STRING
+            | TYPE_BOOL'''
+    p[0] = p[1]
 
 def p_condicion_opt(p):
     '''condicion_opt : WHERE expresion
@@ -417,14 +443,13 @@ def p_error(p):
                 break
             
             if tok.type in sync_tokens:
-                # Encontrado punto de sincronización
-                # Restablecer el parser a un estado consistente
-                parser.errok()
-                return tok
-        
+                # Devolver el token al buffer para que PLY lo procese
+                # como nueva sentencia tras la recuperación natural del stack
+                parser._token_buffer.append(tok)
+                return None  # Sin errok(): PLY usa sentencia:error y luego el buffer
+
         # Si llegamos aquí, alcanzamos EOF
         # El parser continuará con la regla 'sentencia : error'
-        parser.restart()
         
     else:
         # Error al final del archivo
@@ -575,8 +600,8 @@ def _build_error_message(p, context):
         'GREATERTHAN': f"Operador '>' inesperado. Puede que falte un operando",
         'LEQ': f"Operador '<=' inesperado. Puede que falte un operando",
         'GEQ': f"Operador '>=' inesperado. Puede que falte un operando",
-        'AND': f"Operador 'and' inesperado. Puede que falte un operando",
-        'OR': f"Operador 'or' inesperado. Puede que falte un operando",
+        'AND': f"Operando inválido para 'and'. Se esperaba una comparación (ej: asistencia < 60), un identificador, P(...) o 'true'/'false'",
+        'OR': f"Operando inválido para 'or'. Se esperaba una comparación (ej: asistencia < 60), un identificador, P(...) o 'true'/'false'",
         'NOT': f"Operador 'not' inesperado",
         'FROM': f"Palabra clave 'from' inesperada. Verifique la sintaxis de importación o selección",
         'WHERE': f"Palabra clave 'where' inesperada. Verifique la condición",
@@ -629,9 +654,18 @@ def parse(text: str, debug=False) -> Dict[str, Any]:
     lexer_instance.errors = []
     parser_instance = make_parser()
     parser_instance.errors = []
-    
+
+    # Buffer para que p_error pueda "devolver" tokens al stream
+    token_buffer = []
+    parser_instance._token_buffer = token_buffer
+
+    def _buffered_token():
+        if token_buffer:
+            return token_buffer.pop(0)
+        return lexer_instance.token()
+
     try:
-        ast = parser_instance.parse(text, lexer=lexer_instance, debug=debug)
+        ast = parser_instance.parse(text, lexer=lexer_instance, tokenfunc=_buffered_token, debug=debug)
         
         # Combinar errores del lexer y parser
         all_errors = lexer_instance.errors + parser_instance.errors

@@ -158,6 +158,15 @@ class SemanticAnalyzer(ASTVisitor):
             source_name=node.properties.get('source'),
             line=node.line,
         )
+        # Verificar que todas las columnas tengan tipo declarado (SEM-204)
+        from semantic.semantic_errors import SemanticErrorCode
+        for col_name, col_type in (node.properties.get('columnas') or []):
+            if col_type is None:
+                self.add_error(
+                    SemanticErrorCode.MISSING_COLUMN_TYPE,
+                    node.line,
+                    f"La columna '{col_name}' requiere declaración de tipo (ej: {col_name}: real)."
+                )
         self.visit(node.properties.get('condicion'))
         self.visit(node.properties.get('descubrimiento'))
 

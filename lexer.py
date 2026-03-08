@@ -108,6 +108,12 @@ reserved = {
     # Booleanos
     'true': 'TRUE',
     'false': 'FALSE',
+
+    # Tipos de datos
+    'int': 'TYPE_INT',
+    'real': 'TYPE_REAL',
+    'string': 'TYPE_STRING',
+    'bool': 'TYPE_BOOL',
 }
 
 tokens = [
@@ -134,6 +140,7 @@ tokens = [
     'RANGE', # ..
     'COMMA', # ,
     'DOT', # .
+    'COLON', # :
     
     'INT',
     'REAL',
@@ -173,6 +180,7 @@ t_COND = r':-'
 t_RANGE = r'\.\.'
 t_COMMA = r','
 t_DOT = r'\.'
+t_COLON = r':'
 
 # IMPORTANTE: Esta función DEBE ir ANTES de t_REAL y t_INT
 # para que detect_malformed_number tenga prioridad
@@ -204,7 +212,7 @@ def t_ID(t):
     else:
         reserved_words = list(reserved.keys())
         # Ajustar cutoff basado en longitud de la palabra
-        cutoff = 0.85 if len(t.value) > 3 else 0.75
+        cutoff = 0.90 if len(t.value) > 3 else 0.80
         suggestions = difflib.get_close_matches(t.value.lower(), reserved_words, n=1, cutoff=cutoff)
         if suggestions:
             code, category = LexicalErrorCode.RESERVED_TYPO
