@@ -3,6 +3,52 @@
 All notable changes to this project will be documented in this file.
 This project adheres to the "Keep a Changelog" format and uses Semantic Versioning.
 
+## [v2.0.0] - 2026-03-07
+### Agregado
+- **Analizador Semántico** completo con patrón Visitor sobre el AST (`semantic/semantic_analyzer.py`).
+- **Tabla de símbolos** refactorizada: métodos `get()`, `get_category()`, `exists()`, soporte para `data_type` y `category` en cada símbolo.
+- Módulo `semantic/type_checker.py` (SEM-2xx): inferencia de tipos (`infer_type`) y verificaciones activas:
+  - SEM-201: operaciones aritméticas con tipos incompatibles.
+  - SEM-202: operadores lógicos (`and`/`or`/`not`) con operandos no booleanos.
+  - SEM-203: comparaciones relacionales entre tipos incompatibles.
+  - SEM-204: columna de dataset sin tipo declarado.
+- Módulo `semantic/symbol_checks.py` (SEM-1xx): esqueleto con `check_symbol_declared`, `check_redeclaration`, `check_symbol_category` (pendiente de implementación por Carim).
+- Módulo `semantic/DRQ_checks.py` (SEM-3xx/5xx): esqueleto con `check_dataset_source`, `check_dataset_access`, `check_query_symbol` (pendiente de implementación por Gibran).
+- **Tipado de columnas en `select`**: nueva sintaxis `col: tipo` (`int`, `real`, `string`, `bool`). Las columnas se registran en la tabla de símbolos con su tipo.
+- Nuevas palabras reservadas de tipos: `int`, `real`, `string`, `bool` (`TYPE_INT`, `TYPE_REAL`, `TYPE_STRING`, `TYPE_BOOL`).
+- Nuevo token `COLON` (`:`) para separador de tipo en columnas.
+- Integración del analizador semántico en el pipeline de compilación (`ui/main_window.py`).
+- Soporte para abrir archivos `.snp` directamente desde el sistema operativo.
+- Tabla de tokens ordenada por orden de aparición en el código.
+
+### Cambiado
+- **Recuperación de errores (panic mode)** rediseñada: usa `tokenfunc` con buffer (`_token_buffer`) para devolver el token de sincronización al stream tras la recuperación natural del stack, eliminando la cascada de errores falsos en declaraciones posteriores.
+- El parser registra datasets con `category='dataset'` y `data_type='dataset'` (antes era `None, None`).
+- Analizador sintáctico (`parser.py`): categoría y tipo de símbolo asignados correctamente en todas las declaraciones.
+- `lista_ids` en `select` reemplazada por `lista_cols_tipadas` que soporta `ID COLON tipo` e `ID` solo (sin tipo, para permitir SEM-204).
+- Mensajes de error de `or`/`and` mejorados: ahora indican qué se esperaba como operando.
+- Umbral de detección de typos en palabras reservadas ajustado a 0.90 (>3 chars) / 0.80 (≤3 chars) para eliminar falsos positivos (ej. `nota` → `not`).
+- `infer_type` normaliza tokens de tipo (`TYPE_INT` → `'int'`, etc.) y maneja valores Python crudos con guard defensivo.
+
+### Corregido
+- `from _future_ import` corregido a `from __future__ import` en `type_checker.py`.
+- Variable `compatible` renombrada a `compatibles` para consistencia con su uso en `check_relational_operation`.
+- `SymbolTable.get_type()` reemplazado por `SymbolTable.get().data_type` (el método no existía).
+- Valores `None` en `symbol.data_type` ahora retornan `'unknown'` en vez de `None` en `infer_type`.
+
+### Archivos más relevantes modificados
+- `semantic/semantic_analyzer.py` (nuevo — orquestador Visitor)
+- `semantic/type_checker.py` (nuevo — SEM-2xx)
+- `semantic/symbol_checks.py` (nuevo — esqueleto SEM-1xx)
+- `semantic/DRQ_checks.py` (nuevo — esqueleto SEM-3xx/5xx)
+- `semantic/semantic_errors.py` (nuevo — códigos SEM-101 a SEM-501)
+- `symbol_table.py` (refactorización)
+- `lexer.py` (nuevos tokens COLON, TYPE_*, ajuste de cutoff)
+- `parser.py` (tipado de columnas, panic mode con buffer, mensajes mejorados)
+- `ui/main_window.py` (integración semántico)
+
+---
+
 ## [v1.3.0] - 2025-11-23
 ### Agregado
 - Nuevos tokens: `COMMA` (`,`) y `DOT` (`.`) para permitir comas y puntos en expresiones.
