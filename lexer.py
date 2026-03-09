@@ -206,7 +206,7 @@ def t_MALFORMED_NUMBER(t):
     return None
 
 def t_ID(t):
-    r'[A-Za-z_][A-Za-z_0-9.]*'
+    r'[A-Za-z_][A-Za-z_0-9]*'
     if t.value in reserved:
         t.type = reserved[t.value]
     else:

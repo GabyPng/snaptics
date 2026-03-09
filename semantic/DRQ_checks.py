@@ -69,19 +69,62 @@ def check_dataset_access(analyzer: "SemanticAnalyzer", dataset_name: str, line: 
 
 def check_metric_dataset(analyzer: "SemanticAnalyzer", dataset_name: str, line: int):
     """
-    Verifica que el dataset usado en una métrica estadística exista.
+    Verifica que el dataset usado en una métrica estadística exista y sea de categoría 'dataset'.
 
-    Contexto: `mean(ventas.region)` → `ventas` debe estar declarado.
+    Contexto: `mean(ventas.region)` → 'ventas' debe existir y ser un dataset.
 
-    Lanza SEM-302 si `dataset_name` no está en la tabla de símbolos.
+    Lanza SEM-302 si no existe, SEM-103 si no es dataset.
 
     Args:
         analyzer:     instancia del SemanticAnalyzer
         dataset_name: nombre del dataset
         line:         línea del código fuente
     """
-    # TODO (Gibran): reutilizar check_dataset_access o verificar directamente
-    check_dataset_access(analyzer, dataset_name, line)
+    if not analyzer.symbol_table.exists(dataset_name):
+        analyzer.add_error(
+            SemanticErrorCode.DATASET_NOT_DECLARED,
+            line,
+            f"El dataset '{dataset_name}' no está declarado."
+        )
+        return
+    
+    category = analyzer.symbol_table.get_category(dataset_name)
+    if category != 'dataset':
+        analyzer.add_error(
+            SemanticErrorCode.INVALID_SYMBOL_USE,
+            line,
+            f"El símbolo '{dataset_name}' no es un dataset válido."
+        )
+
+
+def check_column_exists(analyzer: "SemanticAnalyzer", column_name: str, line: int):
+    """
+    Verifica que la columna exista y sea de categoría 'column'.
+
+    Contexto: `mean(dataset.col)` → 'col' debe existir como columna.
+
+    Lanza SEM-101 si no existe, SEM-103 si no es columna.
+
+    Args:
+        analyzer:    instancia del SemanticAnalyzer
+        column_name: nombre de la columna
+        line:        línea del código fuente
+    """
+    if not analyzer.symbol_table.exists(column_name):
+        analyzer.add_error(
+            SemanticErrorCode.SYMBOL_NOT_DECLARED,
+            line,
+            f"La columna '{column_name}' no está declarada."
+        )
+        return
+    
+    category = analyzer.symbol_table.get_category(column_name)
+    if category != 'column':
+        analyzer.add_error(
+            SemanticErrorCode.INVALID_SYMBOL_USE,
+            line,
+            f"El símbolo '{column_name}' no es una columna válida."
+        )
 
 
 def check_query_symbol(analyzer: "SemanticAnalyzer", name: str, line: int):

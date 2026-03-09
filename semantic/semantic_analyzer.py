@@ -302,26 +302,31 @@ class SemanticAnalyzer(ASTVisitor):
     def visit_Mean(self, node: ASTNode):
         """
         mean(dataset.col)
-        Gibran: verificar que el dataset exista
+        Gibran: verificar que el dataset exista y sea válido, y la columna exista
         """
-        from semantic.DRQ_checks import check_metric_dataset
+        from semantic.DRQ_checks import check_metric_dataset, check_column_exists
         check_metric_dataset(self, dataset_name=node.properties.get('dataset'), line=node.line)
+        check_column_exists(self, column_name=node.properties.get('columna'), line=node.line)
 
     def visit_Variance(self, node: ASTNode):
         """var(dataset.col)"""
-        from semantic.DRQ_checks import check_metric_dataset
+        from semantic.DRQ_checks import check_metric_dataset, check_column_exists
         check_metric_dataset(self, dataset_name=node.properties.get('dataset'), line=node.line)
+        check_column_exists(self, column_name=node.properties.get('columna'), line=node.line)
 
     def visit_StdDev(self, node: ASTNode):
         """std(dataset.col)"""
-        from semantic.DRQ_checks import check_metric_dataset
+        from semantic.DRQ_checks import check_metric_dataset, check_column_exists
         check_metric_dataset(self, dataset_name=node.properties.get('dataset'), line=node.line)
+        check_column_exists(self, column_name=node.properties.get('columna'), line=node.line)
 
     def visit_Correlation(self, node: ASTNode):
         """correlation(ds1.col1, ds2.col2)"""
-        from semantic.DRQ_checks import check_metric_dataset
+        from semantic.DRQ_checks import check_metric_dataset, check_column_exists
         check_metric_dataset(self, dataset_name=node.properties.get('dataset1'), line=node.line)
+        check_column_exists(self, column_name=node.properties.get('columna1'), line=node.line)
         check_metric_dataset(self, dataset_name=node.properties.get('dataset2'), line=node.line)
+        check_column_exists(self, column_name=node.properties.get('columna2'), line=node.line)
 
     def visit_ListaHechos(self, node: ASTNode):
         """auto_discover dataset(id) where correlation ..."""
