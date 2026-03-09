@@ -86,6 +86,7 @@ class SemanticAnalyzer(ASTVisitor):
     def __init__(self, symbol_table: SymbolTable):
         self.symbol_table = symbol_table
         self.errors: list[SemanticError] = []
+        self._processed_symbols = set()  # simbolos procesados por el semantico, usado para revisar redeclaraciones en symbol_checks.py
 
     # ---------- interfaz pública ----------
 

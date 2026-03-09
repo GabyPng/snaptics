@@ -38,9 +38,12 @@ def check_dataset_source(analyzer: "SemanticAnalyzer", source_name: str, line: i
         source_name: nombre del dataset fuente (ID después de FROM)
         line:        línea del código fuente
     """
-    # TODO (Gibran): verificar con analyzer.symbol_table.exists(source_name)
-    # Si no existe → add_error(SemanticErrorCode.DATASET_SOURCE_NOT_FOUND, line, ...)
-    pass
+    if not analyzer.symbol_table.exists(source_name):
+        analyzer.add_error(
+            SemanticErrorCode.DATASET_SOURCE_NOT_FOUND,
+            line,
+            f"El dataset fuente '{source_name}' no está declarado."
+        )
 
 
 def check_dataset_access(analyzer: "SemanticAnalyzer", dataset_name: str, line: int):
@@ -56,9 +59,12 @@ def check_dataset_access(analyzer: "SemanticAnalyzer", dataset_name: str, line: 
         dataset_name: nombre del dataset (parte izquierda del '.')
         line:         línea del código fuente
     """
-    # TODO (Gibran): verificar con analyzer.symbol_table.exists(dataset_name)
-    # Si no existe → add_error(SemanticErrorCode.DATASET_NOT_DECLARED, line, ...)
-    pass
+    if not analyzer.symbol_table.exists(dataset_name):
+        analyzer.add_error(
+            SemanticErrorCode.DATASET_NOT_DECLARED,
+            line,
+            f"El dataset '{dataset_name}' no está declarado."
+        )
 
 
 def check_metric_dataset(analyzer: "SemanticAnalyzer", dataset_name: str, line: int):
@@ -94,8 +100,18 @@ def check_query_symbol(analyzer: "SemanticAnalyzer", name: str, line: int):
         name:     identificador de la consulta
         line:     línea del código fuente
     """
-    # TODO (Gibran): verificar con analyzer.symbol_table.exists(name)
-    # Verificar también la categoría con analyzer.symbol_table.get_category(name)
-    # Si no existe o categoría no está en _QUERYABLE_CATEGORIES:
-    #   → add_error(SemanticErrorCode.QUERY_SYMBOL_NOT_FOUND, line, ...)
-    pass
+    if not analyzer.symbol_table.exists(name):
+        analyzer.add_error(
+            SemanticErrorCode.QUERY_SYMBOL_NOT_FOUND,
+            line,
+            f"No se puede consultar '{name}': no está declarado."
+        )
+        return
+    
+    category = analyzer.symbol_table.get_category(name)
+    if category not in _QUERYABLE_CATEGORIES:
+        analyzer.add_error(
+            SemanticErrorCode.QUERY_SYMBOL_NOT_FOUND,
+            line,
+            f"No se puede consultar '{name}': es de tipo '{category}' (solo se pueden consultar facts, rules y metrics)."
+        )

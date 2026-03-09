@@ -29,8 +29,12 @@ def check_symbol_declared(analyzer: "SemanticAnalyzer", name: str, line: int):
         name:     nombre del identificador a verificar
         line:     línea del código fuente
     """
-    # TODO (Carim): implementar usando analyzer.symbol_table.exists(name)
-    pass
+    if not analyzer.symbol_table.exists(name):
+        analyzer.add_error(
+            SemanticErrorCode.SYMBOL_NOT_DECLARED,
+            line,
+            f"El símbolo '{name}' no ha sido declarado."
+        )
 
 
 def check_redeclaration(
@@ -51,10 +55,36 @@ def check_redeclaration(
         category: categoría del símbolo ('dataset', 'fact', 'rule', 'metric')
         line:     línea del código fuente
     """
-    # TODO (Carim): implementar usando analyzer.symbol_table.exists(name)
-    # Si existe → add_error(SemanticErrorCode.SYMBOL_REDECLARED, line, ...)
-    # Si no existe → analyzer.symbol_table.add(name, category, None, line)
-    pass
+    # verificar si ya fue procesado por el semantico (redeclaración verdadera)
+    if name in analyzer._processed_symbols:
+        analyzer.add_error(
+            SemanticErrorCode.SYMBOL_REDECLARED,
+            line,
+            f"El símbolo '{name}' ya ha sido declarado."
+        )
+        return
+    
+    # Marcar como procesado
+    analyzer._processed_symbols.add(name)
+    
+    if analyzer.symbol_table.exists(name):
+        # El simbolo ya existe en la tabla 
+        existing_symbol = analyzer.symbol_table.get(name)
+        
+        # Si no tiene categoria, asignarla
+        if existing_symbol and existing_symbol.category is None:
+            existing_symbol.category = category
+        elif existing_symbol and existing_symbol.category != category:
+            # Redeclaracion con categoria diferente
+            analyzer.add_error(
+                SemanticErrorCode.SYMBOL_REDECLARED,
+                line,
+                f"El símbolo '{name}' fue declarado anteriormente como '{existing_symbol.category}', "
+                f"pero aquí se intenta declarar como '{category}'."
+            )
+    else:
+        # No existe, agregarlo con la categoria indicada
+        analyzer.symbol_table.add(name, category, None, line)
 
 
 def check_symbol_category(
@@ -77,6 +107,16 @@ def check_symbol_category(
         expected_categories: lista de categorías válidas para este contexto
         line:                línea del código fuente
     """
-    # TODO (Carim): implementar usando analyzer.symbol_table.get_category(name)
-    # Si la categoría no está en expected_categories → add_error(SEM-103, ...)
-    pass
+    actual_category = analyzer.symbol_table.get_category(name)
+    
+    if actual_category is None:
+        # El símbolo no existe; check_symbol_declared debería haber lanzado SEM-101
+        return
+    
+    if actual_category not in expected_categories:
+        expected_str = ", ".join(expected_categories)
+        analyzer.add_error(
+            SemanticErrorCode.INVALID_SYMBOL_USE,
+            line,
+            f"El símbolo '{name}' es '{actual_category}', pero se esperaba uno de: {expected_str}."
+        )
