@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 This project adheres to the "Keep a Changelog" format and uses Semantic Versioning.
 
+## [v2.1.0] - 2026-03-09
+### Cambiado
+- **`semantic/type_checker.py`** — `infer_type()` ampliada con tres casos nuevos:
+  - `Probabilidad`: ahora retorna `'real'` en lugar de caer a `'unknown'`. Un nodo `P(...)` siempre produce un valor numérico entre 0.0 y 1.0.
+  - `Mean` / `Variance` / `StdDev` / `Correlation`: ahora retornan `'real'`. Las métricas estadísticas producen siempre un valor numérico.
+  - `AccesoMiembro` (`dataset.columna`): en lugar de retornar `'dataset'` de forma fija, ahora consulta la tabla de símbolos para obtener el tipo real de la columna (`int`, `real`, etc.) registrado durante el `select`. Si la columna no tiene tipo declarado, retorna `'real'` como fallback.
+- **`semantic/semantic_analyzer.py`** — inferencia de tipos para facts y rules al visitar sus declaraciones:
+  - `visit_DeclaracionHecho`: tras registrar el símbolo, asigna `data_type = 'real'` en la tabla de símbolos, ya que todo fact es resultado de `P(...)`.
+  - `visit_DeclaracionRegla`: tras registrar el símbolo, asigna `data_type = 'bool'` en la tabla de símbolos, ya que toda rule evalúa a verdadero/falso.
+
+### Corregido
+- El type checker ya no omite silenciosamente la validación de expresiones en reglas que referencian facts. Antes, como los facts tenían `data_type = None`, `infer_type()` retornaba `'unknown'` y `check_relational_operation` saltaba el chequeo. Ahora con `data_type = 'real'` en los facts, expresiones como `asistencia_critica > "hola"` generan correctamente **SEM-203**.
+- `AccesoMiembro` ya no produce falsos positivos **SEM-203** al comparar `dataset.columna` con literales numéricos. El tipo ahora se resuelve desde la tabla de símbolos en lugar de retornar `'dataset'`.
+
+### Archivos modificados
+- `semantic/type_checker.py`
+- `semantic/semantic_analyzer.py`
+
+---
+
 ## [v2.0.0] - 2026-03-07
 ### Agregado
 - **Analizador Semántico** completo con patrón Visitor sobre el AST (`semantic/semantic_analyzer.py`).

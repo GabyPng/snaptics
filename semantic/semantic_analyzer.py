@@ -184,6 +184,10 @@ class SemanticAnalyzer(ASTVisitor):
             category='fact',
             line=node.line,
         )
+        # Los facts siempre son probabilidades → tipo real
+        symbol = self.symbol_table.get(node.properties.get('fact_id'))
+        if symbol:
+            symbol.data_type = 'real'
         self.visit(node.properties.get('probabilidad'))
 
     def visit_DeclaracionMetrica(self, node: ASTNode):
@@ -214,6 +218,10 @@ class SemanticAnalyzer(ASTVisitor):
             category='rule',
             line=node.line,
         )
+        # Las reglas siempre evalúan a verdadero/falso → tipo bool
+        symbol = self.symbol_table.get(node.properties.get('rule_id'))
+        if symbol:
+            symbol.data_type = 'bool'
         self.visit(node.properties.get('condicion'))
 
     def visit_Consulta(self, node: ASTNode):

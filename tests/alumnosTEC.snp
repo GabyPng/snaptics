@@ -15,20 +15,20 @@ dataset alumnos_foco = select asistencia_porcentaje:real, calificacion_tareas:in
 # P es la proporción de alumnos en el dataset donde la condición es TRUE.
 fact asistencia_critica = P(asistencia_porcentaje < 60) 
 
-fact tareas_insuficientes = P(calificacion_tareas < 70) 
+fact tareas_insuficientes = P(alumnos_foco.calificacion_tareas < 70) 
 
-fact promedio_muy_bajo = P(promedio_parcial < 60) 
+fact promedio_muy_bajo = P(alumnos_foco.promedio_parcial < 60) 
 
 fact p_reprobacion_dada_asistencia_baja =
     P(
-        promedio_parcial < 60 given
-        asistencia_porcentaje < 60
+        alumnos_foco.promedio_parcial < 60 given
+        alumnos_foco.asistencia_porcentaje < 60
     )
 
 fact p_reprobacion_dada_tareas_bajas =
     P(
-        promedio_parcial < 60 given
-        calificacion_tareas < 70
+        alumnos_foco.promedio_parcial < 60 given
+        alumnos_foco.calificacion_tareas < 70
     )
 
 

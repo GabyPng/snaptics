@@ -75,13 +75,26 @@ def infer_type(node: "ASTNode", analyzer: "SemanticAnalyzer") -> str:
         return 'unknown'
     
     #Lógicas y Relacionales: Siempre devuelven bool si son válidos
-    if node.type in ['OperacionLogica', 'OperacionRelacional']: 
+    if node.type in ['OperacionLogica', 'OperacionRelacional']:
         return 'bool'
-    
-    #Acceso a dataset.columna
+
+    # Fix 1: P(...) siempre produce un valor entre 0.0 y 1.0
+    if node.type == 'Probabilidad':
+        return 'real'
+
+    # Fix 2: métricas estadísticas producen un valor numérico real
+    if node.type in ['Mean', 'Variance', 'StdDev', 'Correlation']:
+        return 'real'
+
+    # Fix 3: Acceso a dataset.columna — busca el tipo real de la columna
     if node.type == 'AccesoMiembro':
-        return 'dataset'
-    
+        _TYPE_MAP = {'TYPE_INT': 'int', 'TYPE_REAL': 'real', 'TYPE_STRING': 'string', 'TYPE_BOOL': 'bool'}
+        col = node.properties.get('miembro')
+        symbol = analyzer.symbol_table.get(col)
+        if symbol and symbol.data_type:
+            return _TYPE_MAP.get(symbol.data_type, symbol.data_type)
+        return 'real'  # fallback: columnas numéricas son lo más común en este DSL
+
     return 'unknown'
 
 
