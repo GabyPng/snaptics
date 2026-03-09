@@ -146,7 +146,8 @@ def p_preprocesamiento_completo(p):
     p.parser.symbol_table.add(p[2], 'dataset', 'dataset', p.lineno(2))
     # Registrar cada columna con su tipo
     for col_name, col_type in p[5]:
-        p.parser.symbol_table.add(col_name, 'column', col_type, p.lineno(2))
+        # columnas se asocian al dataset actual p[2]
+        p.parser.symbol_table.add(col_name, 'column', col_type, p.lineno(2), dataset=p[2])
 
 def p_lista_ids(p):
     '''lista_ids : ID

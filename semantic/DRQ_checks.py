@@ -97,18 +97,21 @@ def check_metric_dataset(analyzer: "SemanticAnalyzer", dataset_name: str, line: 
         )
 
 
-def check_column_exists(analyzer: "SemanticAnalyzer", column_name: str, line: int):
+def check_column_exists(analyzer: "SemanticAnalyzer", column_name: str, line: int, dataset_name: str | None = None):
     """
-    Verifica que la columna exista y sea de categoría 'column'.
+    Verifica que la columna exista y sea de categoría 'column',
+    opcionalmente comprueba que pertenezca al dataset dado.
 
-    Contexto: `mean(dataset.col)` → 'col' debe existir como columna.
+    Contexto: `mean(dataset.col)` → 'col' debe existir como columna
+    y *si se pasa dataset_name*, debe ser columna de ese dataset.
 
-    Lanza SEM-101 si no existe, SEM-103 si no es columna.
+    Lanza SEM-101 si no existe, SEM-103 si no es columna o no pertenece.
 
     Args:
-        analyzer:    instancia del SemanticAnalyzer
-        column_name: nombre de la columna
-        line:        línea del código fuente
+        analyzer:     instancia del SemanticAnalyzer
+        column_name:  nombre de la columna
+        line:         línea del código fuente
+        dataset_name: nombre del dataset esperado (opcional)
     """
     if not analyzer.symbol_table.exists(column_name):
         analyzer.add_error(
@@ -118,12 +121,20 @@ def check_column_exists(analyzer: "SemanticAnalyzer", column_name: str, line: in
         )
         return
     
-    category = analyzer.symbol_table.get_category(column_name)
-    if category != 'column':
+    symbol = analyzer.symbol_table.get(column_name)
+    if symbol.category != 'column':
         analyzer.add_error(
             SemanticErrorCode.INVALID_SYMBOL_USE,
             line,
             f"El símbolo '{column_name}' no es una columna válida."
+        )
+        return
+    
+    if dataset_name is not None and getattr(symbol, 'dataset', None) != dataset_name:
+        analyzer.add_error(
+            SemanticErrorCode.INVALID_SYMBOL_USE,
+            line,
+            f"La columna '{column_name}' no pertenece al dataset '{dataset_name}'."
         )
 
 

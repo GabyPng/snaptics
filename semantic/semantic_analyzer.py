@@ -305,28 +305,33 @@ class SemanticAnalyzer(ASTVisitor):
         Gibran: verificar que el dataset exista y sea válido, y la columna exista
         """
         from semantic.DRQ_checks import check_metric_dataset, check_column_exists
-        check_metric_dataset(self, dataset_name=node.properties.get('dataset'), line=node.line)
-        check_column_exists(self, column_name=node.properties.get('columna'), line=node.line)
+        ds = node.properties.get('dataset')
+        check_metric_dataset(self, dataset_name=ds, line=node.line)
+        check_column_exists(self, column_name=node.properties.get('columna'), line=node.line, dataset_name=ds)
 
     def visit_Variance(self, node: ASTNode):
         """var(dataset.col)"""
         from semantic.DRQ_checks import check_metric_dataset, check_column_exists
-        check_metric_dataset(self, dataset_name=node.properties.get('dataset'), line=node.line)
-        check_column_exists(self, column_name=node.properties.get('columna'), line=node.line)
+        ds = node.properties.get('dataset')
+        check_metric_dataset(self, dataset_name=ds, line=node.line)
+        check_column_exists(self, column_name=node.properties.get('columna'), line=node.line, dataset_name=ds)
 
     def visit_StdDev(self, node: ASTNode):
         """std(dataset.col)"""
         from semantic.DRQ_checks import check_metric_dataset, check_column_exists
-        check_metric_dataset(self, dataset_name=node.properties.get('dataset'), line=node.line)
-        check_column_exists(self, column_name=node.properties.get('columna'), line=node.line)
+        ds = node.properties.get('dataset')
+        check_metric_dataset(self, dataset_name=ds, line=node.line)
+        check_column_exists(self, column_name=node.properties.get('columna'), line=node.line, dataset_name=ds)
 
     def visit_Correlation(self, node: ASTNode):
         """correlation(ds1.col1, ds2.col2)"""
         from semantic.DRQ_checks import check_metric_dataset, check_column_exists
-        check_metric_dataset(self, dataset_name=node.properties.get('dataset1'), line=node.line)
-        check_column_exists(self, column_name=node.properties.get('columna1'), line=node.line)
-        check_metric_dataset(self, dataset_name=node.properties.get('dataset2'), line=node.line)
-        check_column_exists(self, column_name=node.properties.get('columna2'), line=node.line)
+        ds1 = node.properties.get('dataset1')
+        ds2 = node.properties.get('dataset2')
+        check_metric_dataset(self, dataset_name=ds1, line=node.line)
+        check_column_exists(self, column_name=node.properties.get('columna1'), line=node.line, dataset_name=ds1)
+        check_metric_dataset(self, dataset_name=ds2, line=node.line)
+        check_column_exists(self, column_name=node.properties.get('columna2'), line=node.line, dataset_name=ds2)
 
     def visit_ListaHechos(self, node: ASTNode):
         """auto_discover dataset(id) where correlation ..."""
