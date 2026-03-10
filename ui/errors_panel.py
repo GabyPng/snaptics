@@ -374,6 +374,93 @@ class ErrorsPanel(QtWidgets.QDialog):
 				'ejemplo': 'Estructura sin cerrar al final',
                 'solucion': 'Completar todas las declaraciones'
             },
+
+			# ========= Errores semánticos: símbolos =========
+			{
+				'id': 'SEM-101',
+				'nombre': 'Símbolo no declarado',
+				'descripcion': 'Se usa un identificador que no fue declarado previamente',
+				'ejemplo': 'query ventas_altas  (sin haber declarado ventas_altas)',
+				'solucion': 'Declarar el símbolo antes de usarlo'
+			},
+			{
+				'id': 'SEM-102',
+				'nombre': 'Redeclaración de símbolo',
+				'descripcion': 'Un identificador se declara más de una vez',
+				'ejemplo': 'fact x = P(...)  declarado dos veces',
+				'solucion': 'Eliminar la declaración duplicada o usar un nombre diferente'
+			},
+			{
+				'id': 'SEM-103',
+				'nombre': 'Uso incorrecto de símbolo',
+				'descripcion': 'El símbolo existe pero se usa en un contexto que no corresponde a su categoría',
+				'ejemplo': 'mean(ventas.col)  donde ventas es un fact, no un dataset',
+				'solucion': 'Verificar que el símbolo sea del tipo correcto para el contexto'
+			},
+
+			# ========= Errores semánticos: tipos =========
+			{
+				'id': 'SEM-201',
+				'nombre': 'Tipos incompatibles',
+				'descripcion': 'Operación aritmética entre tipos no numéricos',
+				'ejemplo': '"texto" + 5',
+				'solucion': 'Usar solo valores int o real en operaciones aritméticas'
+			},
+			{
+				'id': 'SEM-202',
+				'nombre': 'Operador lógico con tipo inválido',
+				'descripcion': 'AND, OR o NOT aplicado a un valor que no es bool',
+				'ejemplo': 'ventas AND 4',
+				'solucion': 'Los operandos de AND/OR/NOT deben ser expresiones booleanas'
+			},
+			{
+				'id': 'SEM-203',
+				'nombre': 'Comparación inválida',
+				'descripcion': 'Comparación entre tipos incompatibles',
+				'ejemplo': '"hola" > 5  o  dataset < 60',
+				'solucion': 'Comparar solo tipos compatibles (int/real entre sí, string con string)'
+			},
+			{
+				'id': 'SEM-204',
+				'nombre': 'Tipo de columna no declarado',
+				'descripcion': 'Una columna en select no tiene tipo declarado',
+				'ejemplo': 'select promedio from datos  (sin :int o :real)',
+				'solucion': 'Declarar el tipo: select promedio:real from datos'
+			},
+
+			# ========= Errores semánticos: datasets =========
+			{
+				'id': 'SEM-301',
+				'nombre': 'Dataset fuente inexistente',
+				'descripcion': 'El dataset referenciado en FROM no está declarado',
+				'ejemplo': 'dataset x = select ... from datos_raw  (sin declarar datos_raw)',
+				'solucion': 'Declarar el dataset fuente antes de usarlo'
+			},
+			{
+				'id': 'SEM-302',
+				'nombre': 'Dataset no declarado',
+				'descripcion': 'Se accede a un dataset que no existe en la tabla de símbolos',
+				'ejemplo': 'mean(ventas.precio)  sin haber declarado ventas',
+				'solucion': 'Declarar el dataset antes de acceder a sus columnas'
+			},
+
+			# ========= Errores semánticos: reglas =========
+			{
+				'id': 'SEM-401',
+				'nombre': 'Regla inválida',
+				'descripcion': 'Una regla contiene identificadores no permitidos (datasets, columnas) o no declarados',
+				'ejemplo': 'rule r :- datos.col > 5  o  rule r :- id_no_declarado > 0.5',
+				'solucion': 'En reglas solo se pueden usar facts declarados previamente'
+			},
+
+			# ========= Errores semánticos: consultas =========
+			{
+				'id': 'SEM-501',
+				'nombre': 'Consulta a símbolo inexistente o no consultable',
+				'descripcion': 'El identificador en query no existe o no es consultable (es un dataset)',
+				'ejemplo': 'query mi_dataset  o  query id_no_declarado',
+				'solucion': 'Solo se pueden consultar facts, rules y metrics'
+			},
 		]
 
 		self.set_errors(errors)

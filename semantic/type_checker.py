@@ -161,7 +161,6 @@ def check_logical_operation(analyzer: "SemanticAnalyzer", node: "ASTNode"):
             
     pass
 
-
 def check_relational_operation(analyzer: "SemanticAnalyzer", node: "ASTNode"):
     """
     Verifica compatibilidad de tipos en operaciones relacionales.

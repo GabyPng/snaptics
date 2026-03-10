@@ -112,7 +112,7 @@ class SemanticAnalyzer(ASTVisitor):
     def add_error(self, code_tuple: tuple, line: int, detail: str = ""):
         """
         Registra un error semántico.
-
+        
         Args:
             code_tuple: tupla (código, descripción) de SemanticErrorCode
             line:       línea del código fuente donde ocurre el error

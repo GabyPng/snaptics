@@ -216,7 +216,7 @@ def check_fact_identifier(analyzer: "SemanticAnalyzer", name: str, line: int):
     Contexto: `fact p_reprobacion = P(alumnos.asistencia_baja given alumnos.promedio)`
               → Acceso a columnas: `fact p = P(alumnos.promedio < 60)` (dataset.columna)
 
-    Lanza SEM-302 si es una columna simple (debe usar dataset.columna).
+    Lanza SEM-103 si es una columna simple (debe usar dataset.columna).
     Lanza SEM-101 si no existe.
 
     Args:
@@ -235,7 +235,7 @@ def check_fact_identifier(analyzer: "SemanticAnalyzer", name: str, line: int):
     category = analyzer.symbol_table.get_category(name)
     if category == 'column':
         analyzer.add_error(
-            SemanticErrorCode.DATASET_NOT_DECLARED,
+            SemanticErrorCode.INVALID_SYMBOL_USE,
             line,
             f"La columna '{name}' no puede usarse como identificador simple. Use la sintaxis dataset.columna (ej: alumnos.promedio)."
         )
