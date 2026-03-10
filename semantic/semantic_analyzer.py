@@ -52,6 +52,7 @@ class ASTVisitor:
         if node is None or not isinstance(node, ASTNode):
             return None
         method = getattr(self, f'visit_{node.type}', self.generic_visit)
+        print(method)
         return method(node)
 
     def generic_visit(self, node):
@@ -86,7 +87,7 @@ class SemanticAnalyzer(ASTVisitor):
     def __init__(self, symbol_table: SymbolTable):
         self.symbol_table = symbol_table
         self.errors: list[SemanticError] = []
-        self._processed_symbols = set()  # simbolos procesados por el semantico, usado para revisar redeclaraciones en symbol_checks.py
+        self._processed_symbols = set()  
         self._in_rule = False
         self._in_fact = False
 
