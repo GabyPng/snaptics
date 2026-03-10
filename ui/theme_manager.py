@@ -3,13 +3,45 @@
 Manejador de temas
 """
 
+import json
+import os
+
 
 class ThemeManager:
     """Manejador de temas de la interfaz"""
     
     def __init__(self, main_window):
         self.main_window = main_window
-        self.current_theme = "light"
+        self.config_path = os.path.join(os.path.dirname(__file__), '..', 'config.json')
+        self.current_theme = self.load_theme()
+        self.apply_current_theme()
+    
+    def apply_current_theme(self):
+        """Aplicar el tema actual"""
+        if self.current_theme == "dark":
+            self.apply_dark_theme()
+        else:
+            self.apply_light_theme()
+    
+    def load_theme(self):
+        """Cargar el tema desde el archivo de configuración"""
+        try:
+            if os.path.exists(self.config_path):
+                with open(self.config_path, 'r') as f:
+                    config = json.load(f)
+                    return config.get('theme', 'light')
+        except Exception:
+            pass
+        return 'light'
+    
+    def save_theme(self):
+        """Guardar el tema actual en el archivo de configuración"""
+        try:
+            config = {'theme': self.current_theme}
+            with open(self.config_path, 'w') as f:
+                json.dump(config, f, indent=4)
+        except Exception:
+            pass
     
     def apply_dark_theme(self):
         """Aplicar tema oscuro"""
@@ -98,6 +130,7 @@ class ThemeManager:
         
         self.main_window.setStyleSheet(dark_style)
         self.current_theme = "dark"
+        self.save_theme()
     
     def apply_light_theme(self):
         """Aplicar tema claro"""
@@ -186,6 +219,7 @@ class ThemeManager:
         
         self.main_window.setStyleSheet(light_style)
         self.current_theme = "light"
+        self.save_theme()
     
     def get_current_theme(self):
         """Obtener el tema actual"""

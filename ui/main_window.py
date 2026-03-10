@@ -274,9 +274,6 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
     
     def _setup_initial_state(self):
         """Configurar el estado inicial de la aplicación"""
-        # Aplicar tema claro por defecto
-        self.theme_manager.apply_light_theme()
-        
         # Configurar contenido inicial
         self._set_welcome_content()
         
