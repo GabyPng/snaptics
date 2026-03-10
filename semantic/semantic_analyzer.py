@@ -285,8 +285,8 @@ class SemanticAnalyzer(ASTVisitor):
         Referencia a un identificador.
         Carim: verificar que el símbolo esté declarado (SEM-101) en contexto normal
         Gibran: 
-          - En reglas: verificar que sea fact/rule/metric válido (SEM-401)
-          - En facts: verificar que sea fact/rule/metric válido (SEM-401)
+          - En reglas: verificar que sea fact válido (SEM-401)
+          - En facts: verificar que sea válido y tenga el formato correcto
         """
         if self._in_rule:
             from semantic.DRQ_checks import check_rule_identifier
@@ -322,7 +322,7 @@ class SemanticAnalyzer(ASTVisitor):
             self.add_error(
                 ("SEM-401", "Regla inválida"),
                 node.line,
-                "En reglas no se permiten accesos directos a columnas de dataset. Use solo identificadores de facts, rules o metrics."
+                "En reglas no se permiten accesos directos a columnas de dataset. Use solo identificadores de facts"
             )
             return
         
