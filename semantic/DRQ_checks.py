@@ -169,3 +169,73 @@ def check_query_symbol(analyzer: "SemanticAnalyzer", name: str, line: int):
             line,
             f"No se puede consultar '{name}': es de tipo '{category}' (solo se pueden consultar facts, rules y metrics)."
         )
+
+
+def check_rule_identifier(analyzer: "SemanticAnalyzer", name: str, line: int):
+    """
+    Verifica que el identificador en una regla exista y sea válido.
+
+    Un identificador en regla debe existir como 'fact', 'rule' o 'metric'.
+    No se permiten columnas (ni simples ni via dataset.columna) en reglas.
+
+    Contexto: `rule baja_rentabilidad :- ventas_altas < 0.5` → `ventas_altas` debe existir como
+              fact.
+
+    Lanza SEM-401 si `name` no existe o no es de tipo queryable.
+    Agregar más tipos queryables a las rules, de momento solo facts, pero podrían ser rules o metrics también.
+
+    Args:
+        analyzer: instancia del SemanticAnalyzer
+        name:     identificador en la regla
+        line:     línea del código fuente
+    """
+    if not analyzer.symbol_table.exists(name):
+        analyzer.add_error(
+            SemanticErrorCode.INVALID_RULE,
+            line,
+            f"Identificador '{name}' en regla no está declarado."
+        )
+        return
+    
+    category = analyzer.symbol_table.get_category(name)
+    if category != 'fact':
+        analyzer.add_error(
+            SemanticErrorCode.INVALID_RULE,
+            line,
+            f"En reglas solo se pueden usar hechos; '{name}' es de tipo '{category}'."
+        )
+
+
+def check_fact_identifier(analyzer: "SemanticAnalyzer", name: str, line: int):
+    """
+    Verifica que el identificador en un fact (dentro de prob(expr)) exista y sea válido.
+
+    En facts se pueden usar identificadores de cualquier categoría EXCEPTO columnas simples.
+    Las columnas DEBEN accederse como dataset.columna.
+
+    Contexto: `fact p_reprobacion = P(alumnos.asistencia_baja given alumnos.promedio)`
+              → Acceso a columnas: `fact p = P(alumnos.promedio < 60)` (dataset.columna)
+
+    Lanza SEM-302 si es una columna simple (debe usar dataset.columna).
+    Lanza SEM-101 si no existe.
+
+    Args:
+        analyzer: instancia del SemanticAnalyzer
+        name:     identificador en el fact
+        line:     línea del código fuente
+    """
+    if not analyzer.symbol_table.exists(name):
+        analyzer.add_error(
+            SemanticErrorCode.SYMBOL_NOT_DECLARED,
+            line,
+            f"Identificador '{name}' no está declarado."
+        )
+        return
+    
+    category = analyzer.symbol_table.get_category(name)
+    if category == 'column':
+        analyzer.add_error(
+            SemanticErrorCode.DATASET_NOT_DECLARED,
+            line,
+            f"La columna '{name}' no puede usarse como identificador simple. Use la sintaxis dataset.columna (ej: alumnos.promedio)."
+        )

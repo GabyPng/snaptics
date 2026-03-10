@@ -1,6 +1,7 @@
 # Importar y preparar el dataset
 
 dataset alumnos_raw = import from "alumnos.csv"
+dataset ventas_raw = import from "ventas.csv"
 
 # Estructura esperada del CSV:
 # alumno, asistencia, calificacion, grupo, tareas_completas
@@ -11,9 +12,13 @@ dataset alumnos_foco = select asistencia_porcentaje:real, calificacion_tareas:in
                         from alumnos_raw
                         where promedio_parcial < 80
 
+dataset ventas_altas = select producto:string, unidades_vendidas:int
+                        from ventas_raw
+                        where unidades_vendidas > 50
+
 # Hechos
 # P es la proporción de alumnos en el dataset donde la condición es TRUE.
-fact asistencia_critica = P(asistencia_porcentaje < 60) 
+fact asistencia_critica = P(alumnos_foco.asistencia_porcentaje < 60) 
 
 fact tareas_insuficientes = P(alumnos_foco.calificacion_tareas < 70) 
 

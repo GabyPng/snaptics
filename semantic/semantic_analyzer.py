@@ -87,6 +87,8 @@ class SemanticAnalyzer(ASTVisitor):
         self.symbol_table = symbol_table
         self.errors: list[SemanticError] = []
         self._processed_symbols = set()  # simbolos procesados por el semantico, usado para revisar redeclaraciones en symbol_checks.py
+        self._in_rule = False
+        self._in_fact = False
 
     # ---------- interfaz pública ----------
 
@@ -176,6 +178,7 @@ class SemanticAnalyzer(ASTVisitor):
         fact id = prob(expr)
         Carim: verificar redeclaración (SEM-102)
         Fanny: verificar tipo de la probabilidad
+        Gibran: verificar identificadores en expr (SEM-401)
         """
         from semantic.symbol_checks import check_redeclaration
         check_redeclaration(
@@ -188,7 +191,9 @@ class SemanticAnalyzer(ASTVisitor):
         symbol = self.symbol_table.get(node.properties.get('fact_id'))
         if symbol:
             symbol.data_type = 'real'
+        self._in_fact = True
         self.visit(node.properties.get('probabilidad'))
+        self._in_fact = False
 
     def visit_DeclaracionMetrica(self, node: ASTNode):
         """
@@ -209,7 +214,7 @@ class SemanticAnalyzer(ASTVisitor):
         """
         rule id cond expr
         Carim:  verificar redeclaración                  (SEM-102)
-        Gibran: verificar símbolos referenciados en expr (SEM-101)
+        Gibran: verificar símbolos referenciados en expr (SEM-401)
         """
         from semantic.symbol_checks import check_redeclaration
         check_redeclaration(
@@ -222,7 +227,9 @@ class SemanticAnalyzer(ASTVisitor):
         symbol = self.symbol_table.get(node.properties.get('rule_id'))
         if symbol:
             symbol.data_type = 'bool'
+        self._in_rule = True
         self.visit(node.properties.get('condicion'))
+        self._in_rule = False
 
     def visit_Consulta(self, node: ASTNode):
         """
@@ -276,14 +283,32 @@ class SemanticAnalyzer(ASTVisitor):
     def visit_Identificador(self, node: ASTNode):
         """
         Referencia a un identificador.
-        Carim: verificar que el símbolo esté declarado (SEM-101)
+        Carim: verificar que el símbolo esté declarado (SEM-101) en contexto normal
+        Gibran: 
+          - En reglas: verificar que sea fact/rule/metric válido (SEM-401)
+          - En facts: verificar que sea fact/rule/metric válido (SEM-401)
         """
-        from semantic.symbol_checks import check_symbol_declared
-        check_symbol_declared(
-            self,
-            name=node.properties.get('nombre'),
-            line=node.line,
-        )
+        if self._in_rule:
+            from semantic.DRQ_checks import check_rule_identifier
+            check_rule_identifier(
+                self,
+                name=node.properties.get('nombre'),
+                line=node.line,
+            )
+        elif self._in_fact:
+            from semantic.DRQ_checks import check_fact_identifier
+            check_fact_identifier(
+                self,
+                name=node.properties.get('nombre'),
+                line=node.line,
+            )
+        else:
+            from semantic.symbol_checks import check_symbol_declared
+            check_symbol_declared(
+                self,
+                name=node.properties.get('nombre'),
+                line=node.line,
+            )
 
     # visit_Literal no es necesario: generic_visit lo maneja correctamente
     # ya que los nodos Literal no tienen hijos ASTNode.
@@ -291,14 +316,21 @@ class SemanticAnalyzer(ASTVisitor):
     def visit_AccesoMiembro(self, node: ASTNode):
         """
         dataset.columna
-        Gibran: verificar que el dataset esté declarado (SEM-302)
+        Gibran: verificar que el dataset exista (SEM-302), columna pertenezca a él (SEM-103), y no se use en rules
         """
-        from semantic.DRQ_checks import check_dataset_access
-        check_dataset_access(
-            self,
-            dataset_name=node.properties.get('objeto'),
-            line=node.line,
-        )
+        if self._in_rule:
+            self.add_error(
+                ("SEM-401", "Regla inválida"),
+                node.line,
+                "En reglas no se permiten accesos directos a columnas de dataset. Use solo identificadores de facts, rules o metrics."
+            )
+            return
+        
+        from semantic.DRQ_checks import check_dataset_access, check_column_exists
+        objeto = node.properties.get('objeto')
+        miembro = node.properties.get('miembro')
+        check_dataset_access(self, objeto, node.line)
+        check_column_exists(self, miembro, node.line, objeto)
 
     def visit_Probabilidad(self, node: ASTNode):
         """prob(expr) o prob(expr given expr): visita ambas subexpresiones."""
