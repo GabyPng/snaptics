@@ -9,6 +9,7 @@ import lexer # NO MOVER !!
 import parser as syntax_parser
 from parser import ASTNode
 from semantic.semantic_analyzer import analyze as semantic_analyze
+from ir_generator import generate_ir
 from .ui_base import Ui_snaptics
 from .tokens_panel import TokensPanel
 from .terminal_controller import TerminalController
@@ -169,6 +170,20 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
         self.ast_viewer.header().setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeMode.Stretch)
         self.ast_viewer.header().setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeMode.Interactive)
         self.ast_viewer.header().setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+
+        # Crear el visor de IR (cuádruplas) como tabla
+        self.ir_viewer = QtWidgets.QTableWidget(parent)
+        self.ir_viewer.setObjectName('ir_viewer')
+        self.ir_viewer.setColumnCount(5)
+        self.ir_viewer.setHorizontalHeaderLabels(["#", "Operador", "Arg1", "Arg2", "Resultado"])
+        self.ir_viewer.setAlternatingRowColors(True)
+        self.ir_viewer.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.ir_viewer.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+        self.ir_viewer.horizontalHeader().setStretchLastSection(True)
+        self.ir_viewer.horizontalHeader().setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        self.ir_viewer.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeMode.Stretch)
+        self.ir_viewer.horizontalHeader().setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeMode.Stretch)
+        self.ir_viewer.horizontalHeader().setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeMode.Stretch)
         
         # Configurar color de selección y hover similar al del editor de código
         self.ast_viewer.setStyleSheet("""
@@ -217,9 +232,17 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
             ast_layout.setContentsMargins(5, 5, 5, 5)
             ast_layout.addWidget(self.ast_viewer)
             self.ui.tabBar.addTab(ast_widget, "AST")
-            
-            # Mostrar el AST viewer ya que está en un tab
+
+            # Crear contenedor para IR
+            ir_widget = QtWidgets.QWidget()
+            ir_layout = QtWidgets.QVBoxLayout(ir_widget)
+            ir_layout.setContentsMargins(5, 5, 5, 5)
+            ir_layout.addWidget(self.ir_viewer)
+            self.ui.tabBar.addTab(ir_widget, "IR")
+
+            # Mostrar los viewers ya que están en tabs
             self.ast_viewer.show()
+            self.ir_viewer.show()
         
         self.ui.code_txt = new_editor
     
@@ -253,6 +276,8 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
         self.ui.actionTokens.triggered.connect(self._toggle_tokens_panel)
         # View > Symbols
         self.ui.actionSymbols.triggered.connect(self._open_symbols_dialog)
+        # View > IR
+        self.ui.actionIR.triggered.connect(self._open_ir_dialog)
         
 
         # Señal de ayuda
@@ -402,9 +427,6 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
                         f"Consulta la terminal para ver los detalles completos."
                     )
                 else:
-                    # Compilación exitosa - mostrar mensaje en terminal
-                    self._print_to_terminal("Compilación exitosa")
-
                     # Guardar el AST para uso posterior
                     self.last_ast = parse_result['ast']
                     self.last_symbol_table = parse_result.get('symbol_table')
@@ -412,19 +434,30 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
                     # Mostrar el AST en la pestaña correspondiente
                     self._display_ast(parse_result['ast'])
 
-                    # Cambiar automáticamente a la pestaña del AST
+                    # Generar Representación Intermedia (cuádruplas)
+                    ir_result = generate_ir(semantic_result, parse_result)
+                    self.last_ir_result = ir_result
+
+                    if ir_result['success']:
+                        self._display_ir(ir_result['quadruples'])
+
+                    # Mostrar mensaje en terminal
+                    self._print_to_terminal("Compilación exitosa")
+
+                    # Cambiar automáticamente a la pestaña de IR
                     if hasattr(self.ui, 'tabBar'):
-                        self.ui.tabBar.setCurrentIndex(1)  # Índice 1 = pestaña AST
+                        self.ui.tabBar.setCurrentIndex(2)  # Índice 2 = pestaña IR
 
                     # Mostrar mensaje de éxito
                     num_tokens = len(lex_result['tokens'])
+                    num_quads = len(ir_result.get('quadruples', []))
                     QtWidgets.QMessageBox.information(
                         self,
                         "Compilación Exitosa",
                         f"La compilación se completó sin errores.\n\n"
                         f"• Tokens generados: {num_tokens}\n"
-                        f"• AST generado correctamente\n\n"
-                        f"El AST se muestra en la pestaña 'AST'."
+                        f"• AST generado correctamente\n"
+                        f"• Cuádruplas generadas: {num_quads}\n\n"
                     )
                 
         except Exception as e:
@@ -460,6 +493,30 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
             error_item = QtWidgets.QTreeWidgetItem([f"Error: {str(e)}", "", ""])
             self.ast_viewer.addTopLevelItem(error_item)
     
+    def _display_ir(self, quadruples):
+        """Mostrar las cuádruplas en la tabla IR."""
+        if not hasattr(self, 'ir_viewer'):
+            return
+
+        try:
+            self.ir_viewer.setRowCount(0)
+            self.ir_viewer.setRowCount(len(quadruples))
+
+            for i, q in enumerate(quadruples):
+                a1 = str(q.arg1) if q.arg1 is not None else ''
+                a2 = str(q.arg2) if q.arg2 is not None else ''
+                res = str(q.result) if q.result is not None else ''
+
+                self.ir_viewer.setItem(i, 0, QtWidgets.QTableWidgetItem(str(i)))
+                self.ir_viewer.setItem(i, 1, QtWidgets.QTableWidgetItem(q.op))
+                self.ir_viewer.setItem(i, 2, QtWidgets.QTableWidgetItem(a1))
+                self.ir_viewer.setItem(i, 3, QtWidgets.QTableWidgetItem(a2))
+                self.ir_viewer.setItem(i, 4, QtWidgets.QTableWidgetItem(res))
+
+        except Exception as e:
+            self.ir_viewer.setRowCount(1)
+            self.ir_viewer.setItem(0, 0, QtWidgets.QTableWidgetItem(f"Error: {e}"))
+
     def _build_ast_tree(self, node, parent_item):
         """Construir recursivamente el árbol del AST."""
         if node is None:
@@ -652,7 +709,58 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
             dialog.exec()
         except Exception as e:
             self._print_to_terminal(f"[Symbols] Error al generar tabla de símbolos:\n{e}")
-    
+
+    def _open_ir_dialog(self):
+        """Abrir diálogo con las cuádruplas de la Representación Intermedia."""
+        ir_result = getattr(self, 'last_ir_result', None)
+        if not ir_result or not ir_result.get('quadruples'):
+            QtWidgets.QMessageBox.information(
+                self, "IR Cuádruplas",
+                "No hay cuádruplas disponibles. Compile el código primero."
+            )
+            return
+
+        try:
+            quads = ir_result['quadruples']
+
+            dialog = QtWidgets.QDialog(self)
+            dialog.setWindowTitle("Representación Intermedia (Cuádruplas)")
+            layout = QtWidgets.QVBoxLayout(dialog)
+
+            table = QtWidgets.QTableWidget(parent=dialog)
+            table.setColumnCount(5)
+            table.setHorizontalHeaderLabels(["#", "Operador", "Arg1", "Arg2", "Resultado"])
+            table.setRowCount(len(quads))
+            table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+            table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+            table.setAlternatingRowColors(True)
+            table.horizontalHeader().setStretchLastSection(True)
+            table.horizontalHeader().setSectionResizeMode(
+                0, QtWidgets.QHeaderView.ResizeMode.ResizeToContents
+            )
+
+            for i, q in enumerate(quads):
+                a1 = str(q.arg1) if q.arg1 is not None else ''
+                a2 = str(q.arg2) if q.arg2 is not None else ''
+                res = str(q.result) if q.result is not None else ''
+                table.setItem(i, 0, QtWidgets.QTableWidgetItem(str(i)))
+                table.setItem(i, 1, QtWidgets.QTableWidgetItem(q.op))
+                table.setItem(i, 2, QtWidgets.QTableWidgetItem(a1))
+                table.setItem(i, 3, QtWidgets.QTableWidgetItem(a2))
+                table.setItem(i, 4, QtWidgets.QTableWidgetItem(res))
+
+            layout.addWidget(table)
+            buttons = QtWidgets.QDialogButtonBox(
+                QtWidgets.QDialogButtonBox.StandardButton.Close, parent=dialog
+            )
+            buttons.rejected.connect(dialog.reject)
+            layout.addWidget(buttons)
+
+            dialog.resize(700, 400)
+            dialog.exec()
+        except Exception as e:
+            self._print_to_terminal(f"[IR] Error al generar tabla de cuádruplas:\n{e}")
+
     def _highlight_occurrences(self):
         """Resaltar todas las ocurrencias del texto seleccionado."""
         cursor = self.ui.code_txt.textCursor()

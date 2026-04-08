@@ -166,6 +166,9 @@ class Ui_snaptics(object):
         
         self.actionSymbols = QtGui.QAction(parent=snaptics)
         self.actionSymbols.setObjectName("actionSymbols")
+
+        self.actionIR = QtGui.QAction(parent=snaptics)
+        self.actionIR.setObjectName("actionIR")
         
         # Acciones de ejecución
         self.actionCompile = QtGui.QAction(parent=snaptics)
@@ -210,6 +213,7 @@ class Ui_snaptics(object):
         # Menú Vista
         self.menuView.addAction(self.actionTokens)
         self.menuView.addAction(self.actionSymbols)
+        self.menuView.addAction(self.actionIR)
         
         # Menú Ejecutar
         self.menuRun.addAction(self.actionCompile)
@@ -280,6 +284,7 @@ class Ui_snaptics(object):
         self.actionTokens.setText(_translate("snaptics", "Tokens"))
         self.actionTokens.setShortcut(_translate("snaptics", "Ctrl+T"))
         self.actionSymbols.setText(_translate("snaptics", "Symbols"))
+        self.actionIR.setText(_translate("snaptics", "IR Cuádruplas"))
         
         # Acciones de ejecución
         self.actionCompile.setText(_translate("snaptics", "Compile"))

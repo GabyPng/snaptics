@@ -52,7 +52,6 @@ class ASTVisitor:
         if node is None or not isinstance(node, ASTNode):
             return None
         method = getattr(self, f'visit_{node.type}', self.generic_visit)
-        print(method)
         return method(node)
 
     def generic_visit(self, node):
