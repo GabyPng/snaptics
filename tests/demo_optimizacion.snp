@@ -1,0 +1,31 @@
+# Demostracion de optimizaciones del IROptimizer
+# Compilar (F9) y comparar la pestana "IR" vs "IR Optimizada".
+# El label superior mostrara la reduccion conseguida.
+
+dataset ventas_raw = import from "ventas.csv"
+
+dataset ventas = select monto:real, margen:real
+                  from ventas_raw
+                  where monto > 0
+
+# Hechos con constantes triviales que el optimizador debe plegar.
+
+# 5 + 3 = 8 ; despues * 1 = 8.  El optimizador colapsa todo a 8.0.
+fact umbral_ventas = P(ventas.monto > 5 + 3 * 1)
+
+# 10 ^ 0 = 1.  Folding + algebraica.
+fact margen_referencia = P(ventas.margen > 10 ^ 0)
+
+# 0.5 * 0.4 = 0.2.  Folding aritmetico puro.
+fact baja_rentabilidad = P(ventas.margen < 0.5 * 0.4 + 0.1)
+
+# AND con verdadero -> simplifica al otro operando.
+rule alerta_ventas :-
+    umbral_ventas > 0.5 and true
+
+# OR con falso -> simplifica al otro operando.
+rule alerta_margen :-
+    baja_rentabilidad > 0.3 or false
+
+query alerta_ventas
+query alerta_margen

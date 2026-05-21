@@ -10,6 +10,7 @@ import parser as syntax_parser
 from parser import ASTNode
 from semantic.semantic_analyzer import analyze as semantic_analyze
 from ir_generator import generate_ir
+from optimizer import optimize_ir
 from .ui_base import Ui_snaptics
 from .tokens_panel import TokensPanel
 from .terminal_controller import TerminalController
@@ -172,18 +173,14 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
         self.ast_viewer.header().setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
 
         # Crear el visor de IR (cuádruplas) como tabla
-        self.ir_viewer = QtWidgets.QTableWidget(parent)
-        self.ir_viewer.setObjectName('ir_viewer')
-        self.ir_viewer.setColumnCount(5)
-        self.ir_viewer.setHorizontalHeaderLabels(["#", "Operador", "Arg1", "Arg2", "Resultado"])
-        self.ir_viewer.setAlternatingRowColors(True)
-        self.ir_viewer.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.ir_viewer.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
-        self.ir_viewer.horizontalHeader().setStretchLastSection(True)
-        self.ir_viewer.horizontalHeader().setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
-        self.ir_viewer.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeMode.Stretch)
-        self.ir_viewer.horizontalHeader().setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeMode.Stretch)
-        self.ir_viewer.horizontalHeader().setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeMode.Stretch)
+        self.ir_viewer = self._build_ir_table(parent, 'ir_viewer')
+
+        # Crear el visor de IR Optimizada (cuádruplas tras IROptimizer)
+        self.ir_opt_viewer = self._build_ir_table(parent, 'ir_opt_viewer')
+        # Etiqueta de estadísticas que se mostrará encima de la tabla optimizada
+        self.ir_opt_stats_label = QtWidgets.QLabel("Sin datos. Compile para ver la IR optimizada.", parent)
+        self.ir_opt_stats_label.setObjectName('ir_opt_stats_label')
+        self.ir_opt_stats_label.setStyleSheet("padding: 4px; font-weight: bold;")
         
         # Configurar color de selección y hover similar al del editor de código
         self.ast_viewer.setStyleSheet("""
@@ -240,9 +237,18 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
             ir_layout.addWidget(self.ir_viewer)
             self.ui.tabBar.addTab(ir_widget, "IR")
 
+            # Crear contenedor para IR Optimizada
+            ir_opt_widget = QtWidgets.QWidget()
+            ir_opt_layout = QtWidgets.QVBoxLayout(ir_opt_widget)
+            ir_opt_layout.setContentsMargins(5, 5, 5, 5)
+            ir_opt_layout.addWidget(self.ir_opt_stats_label)
+            ir_opt_layout.addWidget(self.ir_opt_viewer)
+            self.ui.tabBar.addTab(ir_opt_widget, "IR Optimizada")
+
             # Mostrar los viewers ya que están en tabs
             self.ast_viewer.show()
             self.ir_viewer.show()
+            self.ir_opt_viewer.show()
         
         self.ui.code_txt = new_editor
     
@@ -438,26 +444,47 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
                     ir_result = generate_ir(semantic_result, parse_result)
                     self.last_ir_result = ir_result
 
+                    opt_result = None
                     if ir_result['success']:
                         self._display_ir(ir_result['quadruples'])
 
-                    # Mostrar mensaje en terminal
-                    self._print_to_terminal("Compilación exitosa")
+                        # Fase de optimización sobre la IR
+                        opt_result = optimize_ir(ir_result)
+                        self.last_opt_result = opt_result
+                        self._display_ir_optimized(opt_result)
 
-                    # Cambiar automáticamente a la pestaña de IR
+                    # Mostrar mensaje en terminal con reporte del optimizador
+                    terminal_lines = ["Compilación exitosa"]
+                    if opt_result and opt_result.get('success'):
+                        terminal_lines.append("")
+                        terminal_lines.append(opt_result.get('report', ''))
+                    self._print_to_terminal("\n".join(terminal_lines))
+
+                    # Cambiar automáticamente a la pestaña de IR Optimizada
                     if hasattr(self.ui, 'tabBar'):
-                        self.ui.tabBar.setCurrentIndex(2)  # Índice 2 = pestaña IR
+                        self.ui.tabBar.setCurrentIndex(3)  # Índice 3 = IR Optimizada
 
                     # Mostrar mensaje de éxito
                     num_tokens = len(lex_result['tokens'])
                     num_quads = len(ir_result.get('quadruples', []))
+                    opt_summary = ""
+                    if opt_result and opt_result.get('success'):
+                        before = len(opt_result.get('original', []))
+                        after = len(opt_result.get('quadruples', []))
+                        reduction = opt_result.get('reduction', before - after)
+                        pct = (reduction * 100.0 / before) if before else 0.0
+                        opt_summary = (
+                            f"• IR optimizada: {before} → {after} "
+                            f"(reducción {reduction}, {pct:.1f}%)\n"
+                        )
                     QtWidgets.QMessageBox.information(
                         self,
                         "Compilación Exitosa",
                         f"La compilación se completó sin errores.\n\n"
                         f"• Tokens generados: {num_tokens}\n"
                         f"• AST generado correctamente\n"
-                        f"• Cuádruplas generadas: {num_quads}\n\n"
+                        f"• Cuádruplas generadas: {num_quads}\n"
+                        f"{opt_summary}"
                     )
                 
         except Exception as e:
@@ -493,29 +520,73 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
             error_item = QtWidgets.QTreeWidgetItem([f"Error: {str(e)}", "", ""])
             self.ast_viewer.addTopLevelItem(error_item)
     
-    def _display_ir(self, quadruples):
-        """Mostrar las cuádruplas en la tabla IR."""
-        if not hasattr(self, 'ir_viewer'):
+    def _build_ir_table(self, parent, object_name: str):
+        """Construye una QTableWidget configurada para mostrar cuádruplas."""
+        table = QtWidgets.QTableWidget(parent)
+        table.setObjectName(object_name)
+        table.setColumnCount(5)
+        table.setHorizontalHeaderLabels(["#", "Operador", "Arg1", "Arg2", "Resultado"])
+        table.setAlternatingRowColors(True)
+        table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+        table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+        table.horizontalHeader().setStretchLastSection(True)
+        table.horizontalHeader().setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        table.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeMode.Stretch)
+        table.horizontalHeader().setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeMode.Stretch)
+        table.horizontalHeader().setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeMode.Stretch)
+        return table
+
+    def _populate_ir_table(self, table, quadruples):
+        """Llena una tabla de cuádruplas con la lista provista."""
+        if table is None:
             return
-
         try:
-            self.ir_viewer.setRowCount(0)
-            self.ir_viewer.setRowCount(len(quadruples))
-
+            table.setRowCount(0)
+            table.setRowCount(len(quadruples))
             for i, q in enumerate(quadruples):
                 a1 = str(q.arg1) if q.arg1 is not None else ''
                 a2 = str(q.arg2) if q.arg2 is not None else ''
                 res = str(q.result) if q.result is not None else ''
-
-                self.ir_viewer.setItem(i, 0, QtWidgets.QTableWidgetItem(str(i)))
-                self.ir_viewer.setItem(i, 1, QtWidgets.QTableWidgetItem(q.op))
-                self.ir_viewer.setItem(i, 2, QtWidgets.QTableWidgetItem(a1))
-                self.ir_viewer.setItem(i, 3, QtWidgets.QTableWidgetItem(a2))
-                self.ir_viewer.setItem(i, 4, QtWidgets.QTableWidgetItem(res))
-
+                table.setItem(i, 0, QtWidgets.QTableWidgetItem(str(i)))
+                table.setItem(i, 1, QtWidgets.QTableWidgetItem(q.op))
+                table.setItem(i, 2, QtWidgets.QTableWidgetItem(a1))
+                table.setItem(i, 3, QtWidgets.QTableWidgetItem(a2))
+                table.setItem(i, 4, QtWidgets.QTableWidgetItem(res))
         except Exception as e:
-            self.ir_viewer.setRowCount(1)
-            self.ir_viewer.setItem(0, 0, QtWidgets.QTableWidgetItem(f"Error: {e}"))
+            table.setRowCount(1)
+            table.setItem(0, 0, QtWidgets.QTableWidgetItem(f"Error: {e}"))
+
+    def _display_ir(self, quadruples):
+        """Mostrar las cuádruplas (sin optimizar) en la pestaña IR."""
+        self._populate_ir_table(getattr(self, 'ir_viewer', None), quadruples)
+
+    def _display_ir_optimized(self, opt_result: dict):
+        """Mostrar la IR optimizada y sus estadísticas en la pestaña IR Optimizada."""
+        viewer = getattr(self, 'ir_opt_viewer', None)
+        label = getattr(self, 'ir_opt_stats_label', None)
+        if viewer is None:
+            return
+
+        quads = opt_result.get('quadruples', [])
+        self._populate_ir_table(viewer, quads)
+
+        if label is None:
+            return
+        if not opt_result.get('success'):
+            label.setText("La optimización no se ejecutó.")
+            return
+
+        original = opt_result.get('original', [])
+        stats = opt_result.get('stats', {}) or {}
+        before, after = len(original), len(quads)
+        reduction = opt_result.get('reduction', before - after)
+        pct = (reduction * 100.0 / before) if before else 0.0
+        applied = sum(1 for c in stats.values() if c > 0)
+        label.setText(
+            f"Cuádruplas: {before} -> {after}   "
+            f"|   Reducción: {reduction} ({pct:.1f}%)   "
+            f"|   Pases con cambios: {applied}/{len(stats)}"
+        )
 
     def _build_ast_tree(self, node, parent_item):
         """Construir recursivamente el árbol del AST."""
