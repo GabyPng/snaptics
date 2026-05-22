@@ -130,20 +130,28 @@ def check_arithmetic_operation(analyzer: "SemanticAnalyzer", node: "ASTNode"):
 
 def check_logical_operation(analyzer: "SemanticAnalyzer", node: "ASTNode"):
     """
-    Verifica que los operandos de AND / OR / NOT sean booleanos.
+    Verifica que los operandos de AND / OR / NOT sean valores de verdad.
 
-    Tipos válidos: 'bool'
-    Lanza SEM-202 si algún operando no es booleano.
+    Snaptics es un lenguaje de lógica difusa: además de 'bool' clásico,
+    'real' en [0, 1] (lo que producen los facts y las expresiones P(...))
+    es un GRADO DE VERDAD válido. Por eso 'and', 'or' y 'not' aceptan
+    tanto 'bool' como 'real'.
 
-    Ejemplo inválido:  ventas OR 4
+    Ejemplo válido:    rule r :- altas and not margen_bajo
+                       (donde altas y margen_bajo son facts -> 'real')
+    Ejemplo inválido:  ventas OR 4   (4 no es probabilidad, 'ventas' es dataset)
+
+    Lanza SEM-202 si algún operando no es un valor de verdad.
 
     Args:
         analyzer: instancia del SemanticAnalyzer
         node:     nodo OperacionLogica del AST
     """
-    # TODO (Fanny): obtener tipo de izq/der/operando con infer_type()
-    # Si alguno no es 'bool' → add_error(SemanticErrorCode.INVALID_LOGICAL_TYPE, ...)
-    
+    # Tipos aceptados como valor de verdad en lógica difusa:
+    #   - bool: clásico
+    #   - real: grado de verdad en [0, 1] (facts, P(...))
+    tipos_verdad = ('bool', 'real')
+
     # Revisamos operandos según existan (NOT solo tiene 'operando')
     partes = {
         'izq': node.properties.get('izq'),
@@ -155,11 +163,9 @@ def check_logical_operation(analyzer: "SemanticAnalyzer", node: "ASTNode"):
             tipo = infer_type(subnodo, analyzer)
             if tipo == 'unknown':
                 continue  # tipo no resuelto, no hay suficiente info para reportar error
-            if tipo != 'bool':
-                detail = f"Operador lógico requiere bool, pero se encontró '{tipo}' en {nombre}."
+            if tipo not in tipos_verdad:
+                detail = f"Operador lógico requiere bool o real (grado de verdad), pero se encontró '{tipo}' en {nombre}."
                 analyzer.add_error(SemanticErrorCode.INVALID_LOGICAL_TYPE, node.line, detail)
-            
-    pass
 
 def check_relational_operation(analyzer: "SemanticAnalyzer", node: "ASTNode"):
     """
