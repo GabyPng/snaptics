@@ -1,0 +1,214 @@
+;=============================================SECCION DE MACROS=================================== 
+; PANIAGUA GONZALEZ LAURA GABRIELA
+;=================================================================================================
+
+cambioPag MACRO NUEVAPAG
+	MOV AH,5
+	MOV AL,NUEVAPAG
+	INT 10H
+cambioPag ENDM
+
+SCROLL_ARRIBA MACRO LINEAS,COLOR,REN1,COL1,REN2,COL2
+	MOV AH,6
+	MOV AL,LINEAS
+	MOV BH,COLOR
+	MOV CH,REN1
+	MOV CL,COL1
+	MOV DH,REN2
+	MOV DL,COL2
+	INT 10H
+SCROLL_ARRIBA ENDM
+
+Rastreo MACRO 
+	MOV AH,0
+	INT 16H
+		;REGRESA EN AH EL CODIGO DE RASTREO
+;                       AH  Rastreo     AL  ASCII
+;   ESCAPE              01H             1BH
+;   FLECHA ARRIBA       48H             00H
+;   FLECHA ABAJO        50H             00H
+;   FLECHA IZQUIERDA    4BH             00H   
+;   FLECHA DERECHA      4DH             00H
+
+Rastreo ENDM
+
+leerCadena MACRO CADENA
+	MOV AH,10
+	LEA DX,CADENA
+	INT 21H
+leerCadena ENDM
+
+crearDirectorio  MACRO ruta
+    MOV AH,39H
+    LEA DX,RUTA
+    INT 21H
+ crearDirectorio  ENDM
+
+ imprimirSinColor MACRO cadena
+    MOV AH,9
+    LEA DX,cadena
+    INT 21H
+ imprimirSinColor ENDM
+ 
+ imprimeColor     MACRO CADENA,LONG,REN,COL,PAG,MODO,COLOR
+    MOV AH,19
+    LEA BP,CADENA
+    MOV CX,LONG
+    MOV DH,REN
+    MOV DL,COL
+    MOV BH,PAG     
+        MOV AL,MODO
+        MOV BL,COLOR
+    INT 10H
+    
+ imrpimeColor     ENDM  
+ 
+ imprimeCaracter  MACRO TIPOCARACTER,COLOR,CANTIDAD,PAG
+    MOV AH,9             
+    MOV AL,TIPOCARACTER 
+    MOV BL,COLOR
+    MOV CX,CANTIDAD
+    MOV BH,PAG  
+    INT 10H
+     
+ imprimeCaracter  ENDM
+ 
+ cursor           MACRO REN,COL,PAG
+    MOV AH,2
+    MOV DH,REN
+    MOV DL,COL
+    MOV BH,PAG
+    INT 10H   
+ cursor           ENDM    
+
+;============================================SECCION DE ARCHIVOS==================================
+
+crearArchivo MACRO MODO,RUTA
+	MOV AH,3CH
+	MOV CX,MODO
+	LEA DX,RUTA
+	INT 21H
+crearArchivo ENDM
+
+abrirArchivo MACRO MODO,RUTA
+	;MODO 0 = SOLO LECTURA
+	;MODO 1 = SOLO ESCRITURA
+	;MODO 2 = LECTURA/ESCRITURA
+	MOV AH,3DH
+	LEA DX,RUTA
+	MOV AL,MODO
+	INT 21H
+abrirArchivo ENDM
+
+escribirArchivo	MACRO CUANTOS,BUFFER,ID
+	MOV AH,40H
+	MOV BX,ID
+	MOV CX,CUANTOS
+	LEA DX,buffer
+	INT 21H
+escribirArchivo ENDM
+
+leerArchivo MACRO CUANTOS,BUFFERLEIDOS,ID
+	MOV AH,3FH
+	MOV CX,CUANTOS
+	LEA DX,BUFFERLEIDOS
+	MOV BX,ID
+	INT 21H
+leerArchivo ENDM
+
+
+;==================================================FECHA==========================================
+
+FechaM MACRO Fecha,AnioMil,AnioCien,AnioDiez,Res
+ MOV AH,2AH         ;RECUPERAR LA FECHA DEL SISTEMA
+ INT 21H          
+  
+ ;CX = Anio
+ ;DH = MES
+ ;DL = DIA    
+               
+ 
+ ;DIA SEMANA------------------------------- 
+ XOR AX,AX  
+ MOV AL,DL
+ AAM
+ ADD AL, '0'
+ MOV FECHA[1],AL       ; PRIEMR DIGITO
+ ADD AH, '0'
+ MOV FECHA[0],AH       ; SEGUNDO DIGITO
+ 
+ 
+;
+
+;MES -------------------------------
+XOR AX,AX
+MOV AL, DH
+AAM         
+ADD AL, '0'
+MOV FECHA[4],AL
+ADD AH, '0'
+MOV FECHA[3],AH
+
+;
+
+
+;Anio---------------------------------- 
+MOV AX,0
+;PRIMER NUMERO    
+MOV AX,CX
+CWD
+DIV AnioMIL
+AAM
+MOV RES,DX
+ADD AL, '0'
+MOV FECHA[6],AL
+
+;SEGUNDO NUMERO  
+MOV AX,RES    ;025
+CWD
+DIV AnioCIEN       ;ENTRE 100
+AAM
+MOV RES,DX
+ADD AL, '0'
+MOV FECHA[7],AL
+
+;TERCER NUMERO
+MOV AX,RES    ;25
+CWD
+DIV AnioDIEZ       ;ENTRE 10
+AAM
+MOV RES,DX
+ADD AL, '0'
+MOV FECHA[8],AL
+
+;CUARTO NUMERO
+MOV AX,RES     ;5
+AAM
+ADD AL, '0'
+MOV FECHA[9],AL      
+
+ENDM
+             
+;====================================================DOT==========================================
+DOT MACRO matriz
+	MOV DX,2000h ; Input columna 1 del display 1
+	MOV BX,0     ; Contador de columnas totales
+display:
+	MOV SI,0     ; Contador de columnas en matríz
+	MOV CX,5     ; Cada display tiene 5 columnas
+columna:
+	MOV AL,matriz[BX][SI] ; Matríz de puntos
+	OUT DX,AL           ; Output en columna
+	INC SI              ; Siguiente columna en matríz
+	INC DX              ; Siguiente columna en display 
+    ; Si columna actual != 5
+	CMP SI,5       ; Repite ciclo de columnas
+	LOOPNE columna      
+    ; SOLO cuando columna actual = 5                   
+	ADD BX,5       ; Añade 5 a columnas totales
+	CMP BX,40      ; Si columnas totales < 40
+	JL display     ; Pasa al siguiente display 
+ENDM
+
+;===============================================FIN DE MACROS=====================================
+ 
