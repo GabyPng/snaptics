@@ -81,14 +81,16 @@ _UNSUPPORTED_OPS = {
 #             codegen lo "absorbe" mapeando ese temporal a la columna real.
 _NOOP_OPS = {'SELECT', 'MEMBER_ACCESS'}
 
-# Op IR -> (instrucción de salto "si verdadero", símbolo Snaptics)
+# Op IR -> (salto "si verdadero", salto "si falso/negado", símbolo Snaptics)
+# El salto negado es lo que necesita Carim en las plantillas
+# count_<fact>: "si NO se cumple la condición, salta y no cuentes".
 _CMP_OP_INFO = {
-    'GT':  ('JG',  '>'),
-    'LT':  ('JL',  '<'),
-    'EQ':  ('JE',  '=='),
-    'NEQ': ('JNE', '!='),
-    'LEQ': ('JLE', '<='),
-    'GEQ': ('JGE', '>='),
+    'GT':  ('JG',  'JLE', '>'),
+    'LT':  ('JL',  'JGE', '<'),
+    'EQ':  ('JE',  'JNE', '=='),
+    'NEQ': ('JNE', 'JE',  '!='),
+    'LEQ': ('JLE', 'JG',  '<='),
+    'GEQ': ('JGE', 'JL',  '>='),
 }
 
 
@@ -358,7 +360,7 @@ class CodeGenerator:
         for j in range(end_idx - 1, -1, -1):
             q = self.quads[j]
             if q.result == cmp_temp and q.op in _CMP_OP_INFO:
-                jump, sym = _CMP_OP_INFO[q.op]
+                jump, jump_neg, sym = _CMP_OP_INFO[q.op]
                 col = q.arg1
                 dataset = None
                 if isinstance(col, str):
@@ -367,12 +369,13 @@ class CodeGenerator:
                         col = self.column_aliases[col]
                 self.absorbed_cmp_temps.add(cmp_temp)
                 return {
-                    'col':     col,
-                    'dataset': dataset,
-                    'op':      sym,
-                    'value':   int(q.arg2) if isinstance(q.arg2, (int, float)) else q.arg2,
-                    'ir_op':   q.op,
-                    'jump':    jump,
+                    'col':      col,
+                    'dataset':  dataset,
+                    'op':       sym,
+                    'value':    int(q.arg2) if isinstance(q.arg2, (int, float)) else q.arg2,
+                    'ir_op':    q.op,
+                    'jump':     jump,
+                    'jump_neg': jump_neg,
                 }
         return None
 
@@ -418,13 +421,13 @@ class CodeGenerator:
             return None
 
         return {
-            'col_a':   info_a['col'], 'op_a': info_a['op'],
-            'value_a': info_a['value'], 'jump_a': info_a['jump'],
-            'ir_op_a': info_a['ir_op'],
-            'col_b':   info_b['col'], 'op_b': info_b['op'],
-            'value_b': info_b['value'], 'jump_b': info_b['jump'],
-            'ir_op_b': info_b['ir_op'],
-            'dataset': info_a.get('dataset') or info_b.get('dataset'),
+            'col_a':      info_a['col'],     'op_a':      info_a['op'],
+            'value_a':    info_a['value'],   'jump_a':    info_a['jump'],
+            'jump_a_neg': info_a['jump_neg'], 'ir_op_a':   info_a['ir_op'],
+            'col_b':      info_b['col'],     'op_b':      info_b['op'],
+            'value_b':    info_b['value'],   'jump_b':    info_b['jump'],
+            'jump_b_neg': info_b['jump_neg'], 'ir_op_b':   info_b['ir_op'],
+            'dataset':    info_a.get('dataset') or info_b.get('dataset'),
         }
 
     def _classify_dataset_assign(self, target: str, src: str, idx: int):
@@ -438,11 +441,12 @@ class CodeGenerator:
                 cond_info = self._find_cmp_info(q.arg2, j)
                 if cond_info is not None:
                     self.datasets_with_filter[target] = {
-                        'col':    cond_info['col'],
-                        'op':     cond_info['op'],
-                        'value':  cond_info['value'],
-                        'ir_op':  cond_info['ir_op'],
-                        'jump':   cond_info['jump'],
+                        'col':      cond_info['col'],
+                        'op':       cond_info['op'],
+                        'value':    cond_info['value'],
+                        'ir_op':    cond_info['ir_op'],
+                        'jump':     cond_info['jump'],
+                        'jump_neg': cond_info['jump_neg'],
                     }
                 return
         # Si no hay FILTER, no es un dataset filtrado; nada que hacer.
@@ -636,7 +640,7 @@ class CodeGenerator:
         otro grado de verdad (0 o 100 son extremos válidos en lógica difusa).
         """
         op = q.op
-        jump, sym = _CMP_OP_INFO[op]
+        jump = _CMP_OP_INFO[op][0]
         label_id = self._cmp_label_counter
         self._cmp_label_counter += 1
         label_true = f"cmp_t_{label_id}"
