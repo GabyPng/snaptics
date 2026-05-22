@@ -376,7 +376,7 @@ def p_valor_base(p):
                   | FALSE
                   | ID
                   | ID DOT ID
-                  | LPAREN expresion RPAREN
+                  | LPAREN termino_aritmetico RPAREN
                   | probabilidad_condicional'''
     if p.slice[1].type in ('INT', 'REAL', 'STRING'):
         tipo = {'INT': 'int', 'REAL': 'real', 'STRING': 'string'}[p.slice[1].type]
