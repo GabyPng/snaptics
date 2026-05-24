@@ -13,6 +13,7 @@ class SemanticErrorCode:
     # SEM-300: errores de datasets
     DATASET_SOURCE_NOT_FOUND = ("SEM-301", "Dataset fuente inexistente")
     DATASET_NOT_DECLARED     = ("SEM-302", "Dataset no declarado")
+    CSV_FILE_NOT_FOUND       = ("SEM-303", "Archivo CSV no encontrado")
 
     # SEM-400: errores de reglas
     INVALID_RULE = ("SEM-401", "Regla inválida")

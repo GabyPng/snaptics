@@ -415,7 +415,8 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
                 )
             else:
                 # Análisis semántico
-                semantic_result = semantic_analyze(parse_result)
+                current_snp_path = self.file_manager.get_current_file()
+                semantic_result = semantic_analyze(parse_result, source_path=current_snp_path)
                 semantic_errors = semantic_result.get('errors', [])
                 has_semantic_errors = len(semantic_errors) > 0
 

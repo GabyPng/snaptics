@@ -7,11 +7,13 @@ métricas estadísticas, reglas y consultas.
 Errores manejados aquí:
   SEM-301  Dataset fuente inexistente
   SEM-302  Dataset no declarado
+  SEM-303  Archivo CSV no encontrado
   SEM-401  Regla inválida
   SEM-501  Consulta a símbolo inexistente
 """
 
 from __future__ import annotations
+import os
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -22,6 +24,43 @@ from semantic.semantic_errors import SemanticErrorCode
 
 # Categorías que acepta `query`
 _QUERYABLE_CATEGORIES = ('fact', 'rule', 'metric')
+
+
+def check_csv_file_exists(analyzer: "SemanticAnalyzer", source_file: str, line: int):
+    """
+    Verifica que el archivo CSV referenciado en un `import from` exista.
+
+    Contexto: `dataset ventas_raw = import from "ventas.csv"`
+              → el archivo "ventas.csv" debe existir en disco.
+
+    Resolución de rutas:
+      - rutas absolutas se usan tal cual.
+      - rutas relativas se resuelven contra `analyzer.source_dir`
+        (directorio del .snp) si está definido; si no, contra el
+        directorio de trabajo actual.
+
+    Lanza SEM-303 si el archivo no se encuentra.
+
+    Args:
+        analyzer:    instancia del SemanticAnalyzer
+        source_file: string literal con la ruta del CSV
+        line:        línea del código fuente
+    """
+    if not source_file:
+        return
+
+    if os.path.isabs(source_file):
+        resolved = source_file
+    else:
+        base_dir = getattr(analyzer, 'source_dir', None) or os.getcwd()
+        resolved = os.path.join(base_dir, source_file)
+
+    if not os.path.isfile(resolved):
+        analyzer.add_error(
+            SemanticErrorCode.CSV_FILE_NOT_FOUND,
+            line,
+            f"El archivo CSV '{source_file}' no fue encontrado."
+        )
 
 
 def check_dataset_source(analyzer: "SemanticAnalyzer", source_name: str, line: int):

@@ -48,8 +48,15 @@ _LIB_FILES = (
 
 # ==================== pipeline ====================
 
-def compile_snaptics(source: str) -> dict:
-    """Corre el pipeline completo, devuelve dict con asm y errores."""
+def compile_snaptics(source: str, source_path: str | None = None) -> dict:
+    """Corre el pipeline completo, devuelve dict con asm y errores.
+
+    Args:
+        source:      texto del programa .snp.
+        source_path: ruta del archivo .snp en disco (opcional).
+                     Se usa para resolver rutas relativas en `import from`
+                     al verificar la existencia del CSV (SEM-303).
+    """
     lex = lexer.tokenize(source)
     if lex.get('errors'):
         return {'ok': False, 'stage': 'lex', 'errors': lex['errors']}
@@ -61,7 +68,7 @@ def compile_snaptics(source: str) -> dict:
     if syn_errors:
         return {'ok': False, 'stage': 'parse', 'errors': syn_errors}
 
-    sem = semantic_analyze(pr)
+    sem = semantic_analyze(pr, source_path=source_path)
     if sem.get('errors'):
         return {'ok': False, 'stage': 'semantic', 'errors': sem['errors']}
 
@@ -202,7 +209,8 @@ def main():
         os.makedirs(build_dir, exist_ok=True)
         args.output = os.path.join(build_dir, default_name + '.asm')
 
-    result = compile_snaptics(source)
+    snp_path = os.path.abspath(args.source) if args.source else None
+    result = compile_snaptics(source, source_path=snp_path)
     if not result['ok']:
         print(f"[FAIL] etapa '{result['stage']}':")
         for e in result['errors']:

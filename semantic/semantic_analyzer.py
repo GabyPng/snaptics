@@ -83,12 +83,17 @@ class SemanticAnalyzer(ASTVisitor):
       - DRQ_checks     => Gibran (SEM-3xx / 4xx / 5xx)
     """
 
-    def __init__(self, symbol_table: SymbolTable):
+    def __init__(self, symbol_table: SymbolTable, source_path: str | None = None):
         self.symbol_table = symbol_table
         self.errors: list[SemanticError] = []
-        self._processed_symbols = set()  
+        self._processed_symbols = set()
         self._in_rule = False
         self._in_fact = False
+        # Directorio base contra el que se resuelven rutas relativas en
+        # `import from`. Se obtiene del .snp en disco; si no hay archivo
+        # asociado (p. ej. ejecución desde código en memoria), queda None
+        # y la verificación caerá al directorio de trabajo actual.
+        self.source_dir = os.path.dirname(os.path.abspath(source_path)) if source_path else None
 
     # ---------- interfaz pública ----------
 
@@ -131,13 +136,20 @@ class SemanticAnalyzer(ASTVisitor):
     def visit_Importacion(self, node: ASTNode):
         """
         dataset id = import from "archivo"
-        Carim: verificar redeclaración de símbolo (SEM-102)
+        Carim:  verificar redeclaración de símbolo (SEM-102)
+        Gibran: verificar que el archivo CSV exista (SEM-303)
         """
         from semantic.symbol_checks import check_redeclaration
+        from semantic.DRQ_checks import check_csv_file_exists
         check_redeclaration(
             self,
             name=node.properties.get('dataset_id'),
             category='dataset',
+            line=node.line,
+        )
+        check_csv_file_exists(
+            self,
+            source_file=node.properties.get('source_file'),
             line=node.line,
         )
 
@@ -381,7 +393,7 @@ class SemanticAnalyzer(ASTVisitor):
 
 # ==================== INTEGRACIÓN CON EL COMPILADOR ====================
 
-def analyze(parse_result: dict) -> dict:
+def analyze(parse_result: dict, source_path: str | None = None) -> dict:
     """
     Función de integración con el pipeline del compilador.
 
@@ -395,6 +407,9 @@ def analyze(parse_result: dict) -> dict:
             - 'symbol_table': SymbolTable construida por el parser
             - 'success':      bool
             - 'errors':       lista de errores léxicos/sintácticos
+        source_path: ruta del archivo .snp en disco (opcional).
+            Se usa para resolver rutas relativas en `import from "..."`
+            al verificar la existencia del CSV (SEM-303).
 
     Returns:
         dict:
@@ -421,7 +436,7 @@ def analyze(parse_result: dict) -> dict:
             'all_errors': syntax_errors,
         }
 
-    analyzer = SemanticAnalyzer(symbol_table)
+    analyzer = SemanticAnalyzer(symbol_table, source_path=source_path)
     result = analyzer.analyze(ast)
 
     semantic_dicts = [e.to_dict() for e in result['errors']]
