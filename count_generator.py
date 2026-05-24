@@ -22,8 +22,12 @@ _LIB_DIR = os.path.join(os.path.dirname(__file__), 'lib')
 # Mapeo hardcodeado nombre de columna -> índice 0-based en el CSV.
 # Se complementa con lo que se extrae de los quadruples SELECT.
 COLUMNAS: dict[str, int] = {
-    'asistencia': 0,
-    'promedio':   1,
+    'alumno':       0,
+    'asistencia':   1,
+    'calificacion': 2,
+    'grupo':        3,
+    'tareas':       4,
+    'promedio':     5,
 }
 
 

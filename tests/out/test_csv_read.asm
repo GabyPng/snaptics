@@ -28,7 +28,7 @@ include Biblioteca.lib
 .STACK 200h
 
 .DATA
-    RUTA         DB 'C:\dataset.txt', 0
+    RUTA         DB 'C:\dataset.csv', 0
     ID_ARCHIVO   DW 0
     BUFFER       DB 512 DUP(' ')
     BYTES_LEIDOS DW 0
@@ -41,8 +41,8 @@ include Biblioteca.lib
     msg_ok       DB 'Archivo abierto OK', 0Dh, 0Ah, '$'
     msg_err      DB 'ERROR: no se pudo abrir el archivo', 0Dh, 0Ah, '$'
     msg_fila     DB 'Fila ', '$'
-    msg_col0     DB '  col0=', '$'
-    msg_col1     DB '  col1=', '$'
+    msg_col0     DB '  asistencia=', '$'
+    msg_col1     DB '  promedio=', '$'
     msg_nl       DB 0Dh, 0Ah, '$'
     fila_num     DB 0            ; contador de filas (1-based para mostrar)
 
@@ -93,16 +93,16 @@ loop_filas:
     ; guardar inicio de fila
     MOV BX, SI                   ; BX = inicio de la fila actual
 
-    ; ---- leer columna 0 ----
+    ; ---- leer columna 1: asistencia ----
     MOV SI, BX
-    MOV AL, 0
+    MOV AL, 1
     CALL skip_to_col_N
     CALL parse_int
     MOV col0_val, AX
 
-    ; ---- leer columna 1 ----
+    ; ---- leer columna 5: promedio ----
     MOV SI, BX
-    MOV AL, 1
+    MOV AL, 5
     CALL skip_to_col_N
     CALL parse_int
     MOV col1_val, AX

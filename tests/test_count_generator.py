@@ -89,7 +89,7 @@ def caso_simple_sin_where(t: T):
     t.check('count_asistencia_critica PROC' in asm,      "PROC generado")
     t.check('CMP AX, 60' in asm,                         "umbral 60 presente")
     t.check('JGE no_match_asistencia_critica' in asm,    "jump_neg correcto")
-    t.check('MOV AL, 0' in asm,                          "columna asistencia -> idx 0")
+    t.check('MOV AL, 1' in asm,                          "columna asistencia -> idx 1")
     t.check('skip_where_asistencia_critica' not in asm,  "sin snippet where")
     t.check('fila_loop_asistencia_critica:' in asm,      "etiqueta con sufijo fact")
     print(t.report())
@@ -127,10 +127,10 @@ def caso_simple_con_where(t: T):
     t.check('check_done_asistencia_critica:' in asm,     "etiqueta check_done con sufijo")
     t.check('CMP AX, 80' in asm,                         "umbral del filtro (80) presente")
     t.check('CMP AX, 60' in asm,                         "umbral del fact (60) presente")
-    # promedio es idx 1 en el SELECT -> MOV AL, 1 para el where
-    t.check('MOV AL, 1' in asm,                          "filtro usa columna promedio -> idx 1")
-    # asistencia es idx 0 -> MOV AL, 0 para el fact
-    t.check('MOV AL, 0' in asm,                          "fact usa columna asistencia -> idx 0")
+    # promedio es idx 5 en el CSV real -> MOV AL, 5 para el where
+    t.check('MOV AL, 5' in asm,                          "filtro usa columna promedio -> idx 5")
+    # asistencia es idx 1 en el CSV real -> MOV AL, 1 para el fact
+    t.check('MOV AL, 1' in asm,                          "fact usa columna asistencia -> idx 1")
     print(t.report())
 
 
@@ -168,9 +168,9 @@ def caso_given_con_where(t: T):
     t.check('no_a_p_reprob:' in asm,           "etiqueta no_a con sufijo")
     t.check('no_b_p_reprob:' in asm,           "etiqueta no_b con sufijo")
     t.check('skip_where_p_reprob:' in asm,     "snippet where inyectado")
-    # col_b = asistencia idx 0, col_a = promedio idx 1
-    t.check(asm.count('MOV AL, 0') >= 1,       "asistencia -> idx 0 usado")
-    t.check(asm.count('MOV AL, 1') >= 1,       "promedio   -> idx 1 usado")
+    # col_b = asistencia idx 1, col_a = promedio idx 5
+    t.check(asm.count('MOV AL, 1') >= 1,       "asistencia -> idx 1 usado")
+    t.check(asm.count('MOV AL, 5') >= 1,       "promedio   -> idx 5 usado")
     print(t.report())
 
 
