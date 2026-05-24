@@ -15,9 +15,19 @@ from __future__ import annotations
 import os
 import sys
 
+# Bootstrap: añadir la raíz del proyecto y este directorio al sys.path
+# para que `from code_generator import ...` y `from ir_generator import ...`
+# funcionen independientemente desde dónde se invoque este módulo.
+_HERE = os.path.dirname(os.path.abspath(__file__))            # codegen/
+_PROJECT_ROOT = os.path.dirname(_HERE)                        # snaptics/
+for _p in (_PROJECT_ROOT, _HERE):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
 from code_generator import generate_code
 
-_LIB_DIR = os.path.join(os.path.dirname(__file__), 'lib')
+# Plantillas y snippets viven en codegen/lib/plantillas/
+_LIB_DIR = os.path.join(_HERE, 'lib', 'plantillas')
 
 # Fallback hardcodeado de nombre de columna -> índice 0-based en el CSV.
 # Solo se usa para nombres que NO aparezcan en ningún SELECT del programa.

@@ -17,9 +17,14 @@ from __future__ import annotations
 import os
 import sys
 
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if _ROOT not in sys.path:
-    sys.path.insert(0, _ROOT)
+# Bootstrap: test en tests/codegen/, raíz del proyecto dos niveles arriba,
+# y los módulos a probar viven en codegen/ — añadimos ambas rutas.
+_HERE = os.path.dirname(os.path.abspath(__file__))            # tests/codegen/
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(_HERE))       # snaptics/
+_CODEGEN = os.path.join(_PROJECT_ROOT, 'codegen')
+for _p in (_PROJECT_ROOT, _CODEGEN):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 try:
     sys.stdout.reconfigure(encoding='utf-8')

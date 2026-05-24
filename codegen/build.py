@@ -21,9 +21,14 @@ import os
 import sys
 import argparse
 
-_ROOT = os.path.dirname(os.path.abspath(__file__))
-if _ROOT not in sys.path:
-    sys.path.insert(0, _ROOT)
+# Bootstrap: build.py vive en codegen/, importa cosas de la raíz del proyecto
+# (lexer, parser, semantic, ir_generator, optimizer) y también de su mismo
+# directorio (code_generator, count_generator). Añadimos ambos al sys.path.
+_HERE = os.path.dirname(os.path.abspath(__file__))            # codegen/
+_PROJECT_ROOT = os.path.dirname(_HERE)                        # snaptics/
+for _p in (_PROJECT_ROOT, _HERE):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 import lexer
 import parser as syntax_parser
@@ -33,10 +38,11 @@ from optimizer import optimize_ir
 from code_generator import generate_code
 from count_generator import generate_counts
 
+# Las libs de producción viven al lado de este script.
 _LIB_FILES = (
-    'lib/fuzzy_logic.asm',
-    'lib/output_devices.asm',
-    'lib/primitives.asm',
+    os.path.join(_HERE, 'lib', 'fuzzy_logic.asm'),
+    os.path.join(_HERE, 'lib', 'output_devices.asm'),
+    os.path.join(_HERE, 'lib', 'primitives.asm'),
 )
 
 
@@ -92,15 +98,15 @@ def _stitch(codegen_asm: str, counts_asm: str) -> str:
     tail = codegen_asm[idx:]
 
     lib_chunks = []
-    for path in _LIB_FILES:
-        full = os.path.join(_ROOT, path)
+    for full in _LIB_FILES:
         content = _read_text(full)
         # Algunas declaraciones DB deben vivir en .DATA (las emite el codegen),
         # no en .CODE donde se incluye este archivo. Si el archivo las trae,
         # las filtramos para evitar conflicto de segmentos y/o de símbolo.
         content = _strip_data_dupes(content)
-        lib_chunks.append(f"\n; ====== inicio de {path} ======\n{content}"
-                          f"\n; ====== fin de {path} ======\n")
+        rel = os.path.relpath(full, _HERE)
+        lib_chunks.append(f"\n; ====== inicio de {rel} ======\n{content}"
+                          f"\n; ====== fin de {rel} ======\n")
 
     pieces = [head]
     pieces.append("\n; ============================================================\n")
@@ -192,8 +198,9 @@ def main():
         return  # unreachable, calla al linter
 
     if args.output is None:
-        os.makedirs(os.path.join(_ROOT, 'build'), exist_ok=True)
-        args.output = os.path.join('build', default_name + '.asm')
+        build_dir = os.path.join(_HERE, 'build')
+        os.makedirs(build_dir, exist_ok=True)
+        args.output = os.path.join(build_dir, default_name + '.asm')
 
     result = compile_snaptics(source)
     if not result['ok']:

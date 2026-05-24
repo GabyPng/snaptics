@@ -1,8 +1,21 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-snaptics
+snaptics — entry point del IDE.
+
+Este script vive en ide/ y necesita encontrar:
+  - la GUI (ide/ui/, sibling)
+  - los módulos del compilador (raíz del proyecto, un nivel arriba)
 """
+import os as _os
+import sys as _sys
+
+_HERE = _os.path.dirname(_os.path.abspath(__file__))          # ide/
+_PROJECT_ROOT = _os.path.dirname(_HERE)                       # snaptics/
+for _p in (_PROJECT_ROOT, _HERE):
+    if _p not in _sys.path:
+        _sys.path.insert(0, _p)
+
 
 def main():
     """Función principal de la aplicación"""

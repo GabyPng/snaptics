@@ -53,6 +53,15 @@ inyectar/INCLUDEar su parte.
 """
 
 from __future__ import annotations
+
+# Bootstrap: este módulo vive en codegen/, pero importa cosas del front-end
+# que están en la raíz del proyecto (ir_generator, etc.). Añadimos la raíz
+# al sys.path para que los imports flat sigan funcionando.
+import os as _os, sys as _sys
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+if _PROJECT_ROOT not in _sys.path:
+    _sys.path.insert(0, _PROJECT_ROOT)
+
 from ir_generator import Quadruple
 
 

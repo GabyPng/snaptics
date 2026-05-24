@@ -111,6 +111,16 @@ stcn_comma:
     ; cuando llegamos aquí, SI ya está en el inicio de la columna N
 
 stcn_done:
+    ; saltar espacios iniciales tipo "juan,   85" -> dejar SI en '8'.
+    ; Mejora aportada por Carim en el merge: tolera CSVs con espacios
+    ; entre columnas, no solo el formato estricto.
+stcn_spaces:
+    MOV AH, [SI]
+    CMP AH, ' '
+    JNE stcn_end
+    INC SI
+    JMP stcn_spaces
+stcn_end:
     POP CX
     RET
 skip_to_col_N ENDP

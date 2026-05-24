@@ -15,16 +15,23 @@ de un .snp; si falla en fases previas (por ejemplo el type_checker
 trata los facts como 'real' y rechaza fact AND fact), se reporta como
 'esperado: pendiente' y no se considera fallo del codegen.
 
-Los .asm generados se escriben en tests/out/ para abrirlos en emu8086.
+Los .asm generados se escriben en tests/codegen/out/ (al lado de este
+archivo) para abrirlos en emu8086.
 """
 
 from __future__ import annotations
 import os
 import sys
 
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if _ROOT not in sys.path:
-    sys.path.insert(0, _ROOT)
+# Bootstrap: este test vive en tests/codegen/, así que la raíz del proyecto
+# queda dos niveles arriba. Además, los módulos que prueba (code_generator,
+# count_generator) están en codegen/, así que también lo añadimos.
+_HERE = os.path.dirname(os.path.abspath(__file__))            # tests/codegen/
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(_HERE))       # snaptics/
+_CODEGEN = os.path.join(_PROJECT_ROOT, 'codegen')
+for _p in (_PROJECT_ROOT, _CODEGEN):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 try:
     sys.stdout.reconfigure(encoding='utf-8')
@@ -38,7 +45,7 @@ from code_generator import generate_code, CodeGenerator
 
 # ==================== helpers ====================
 
-OUT_DIR = os.path.join(_ROOT, 'tests', 'out')
+OUT_DIR = os.path.join(_HERE, 'out')
 os.makedirs(OUT_DIR, exist_ok=True)
 
 
