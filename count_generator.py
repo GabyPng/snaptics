@@ -19,12 +19,11 @@ from code_generator import generate_code
 
 _LIB_DIR = os.path.join(os.path.dirname(__file__), 'lib')
 
-# Mapeo hardcodeado nombre de columna -> índice 0-based en el CSV.
-# Se complementa con lo que se extrae de los quadruples SELECT.
-COLUMNAS: dict[str, int] = {
-    'asistencia': 0,
-    'promedio':   1,
-}
+# Fallback hardcodeado de nombre de columna -> índice 0-based en el CSV.
+# Solo se usa para nombres que NO aparezcan en ningún SELECT del programa.
+# Lo normal es que el SELECT declare todas las columnas del CSV en orden y
+# entonces este dict puede quedarse vacío.
+COLUMNAS: dict[str, int] = {}
 
 
 # ==================== helpers internos ====================
@@ -36,17 +35,24 @@ def _load_template(filename: str) -> str:
 
 
 def _build_column_map(quads) -> dict[str, int]:
-    """Extrae columna->índice de los quadruples SELECT.
-    Complementa (no sobrescribe) COLUMNAS.
+    """Construye el mapeo columna->índice desde los quadruples SELECT.
+    El SELECT manda: si declara 'alumno:int, asistencia:int, promedio:int'
+    entonces alumno=0, asistencia=1, promedio=2 (índices 0-based en el
+    CSV crudo). COLUMNAS sólo entra como fallback para nombres que no
+    aparezcan en ningún SELECT.
     """
-    col_map: dict[str, int] = dict(COLUMNAS)
+    col_map: dict[str, int] = {}
     for q in quads:
         if q.op == 'SELECT' and isinstance(q.arg2, str):
-            # arg2 == 'asistencia:real, promedio:real'
+            # arg2 == 'alumno:int, asistencia:int, promedio:int'
             cols = [c.split(':')[0].strip() for c in q.arg2.split(',')]
             for idx, name in enumerate(cols):
-                if name and name not in col_map:
-                    col_map[name] = idx
+                if name:
+                    col_map[name] = idx  # el SELECT sobreescribe
+    # fallback para nombres no listados en ningún SELECT
+    for name, idx in COLUMNAS.items():
+        if name not in col_map:
+            col_map[name] = idx
     return col_map
 
 

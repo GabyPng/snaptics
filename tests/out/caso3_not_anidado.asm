@@ -9,7 +9,7 @@ include Biblioteca.lib
     ; ---- Sección DATA generada por codegen ----
     RUTA         DB 'ventas.csv', 0
     ID_ARCHIVO   DW 0
-    BUFFER       DB 4096 DUP(' ')
+    BUFFER       DB 4096 DUP(0)
     BYTES_LEIDOS DW 0
 
     ; -- Facts derivados del dataset (los llena count_<fact>) --
@@ -30,10 +30,9 @@ include Biblioteca.lib
     ; -- Mensajes de queries (consumidos por show_result) --
     msg_sano             DB 'sano = $'
 
-    ; -- Mensajes de evidencia (consumidos por show_result) --
-    msg_evid_baja DB ' (evidencia: baja)', 13, 10, '$'
-    msg_evid_mod  DB ' (evidencia: moderada)', 13, 10, '$'
-    msg_evid_alta DB ' (evidencia: alta)', 13, 10, '$'
+    msg_evid_baja DB 13, 10, 'Evidencia: BAJA$'
+    msg_evid_mod  DB 13, 10, 'Evidencia: MODERADA$'
+    msg_evid_alta DB 13, 10, 'Evidencia: ALTA$'
     msg_err_file  DB 'Error abriendo el dataset.', 13, 10, '$'
 
 .CODE

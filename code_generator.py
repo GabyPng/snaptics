@@ -487,7 +487,10 @@ class CodeGenerator:
             path = next(iter(self.datasets.values()), self.dataset_path)
             D(f"    RUTA         DB '{path}', 0")
             D( "    ID_ARCHIVO   DW 0")
-            D(f"    BUFFER       DB {BUFFER_SIZE} DUP(' ')")
+            # IMPORTANTE: inicializar con 0, NO con espacios. skip_to_eol usa
+            # null como guard de fin de buffer. Si el CSV no termina con LF,
+            # los espacios harían que el loop nunca termine.
+            D(f"    BUFFER       DB {BUFFER_SIZE} DUP(0)")
             D( "    BYTES_LEIDOS DW 0")
             D("")
 
@@ -521,10 +524,14 @@ class CodeGenerator:
                 D(f"    msg_{name:<16} DB '{name} = $'")
             D("")
 
-        D("    ; -- Mensajes de evidencia (consumidos por show_result) --")
-        D("    msg_evid_baja DB ' (evidencia: baja)', 13, 10, '$'")
-        D("    msg_evid_mod  DB ' (evidencia: moderada)', 13, 10, '$'")
-        D("    msg_evid_alta DB ' (evidencia: alta)', 13, 10, '$'")
+        # Mensajes de evidencia: deben estar en DATA (no en CODE), porque
+        # show_result los imprime con INT 21h/9h que usa DS:DX. Si vivieran
+        # en CODE (que es donde está output_devices.asm tras el include),
+        # DS:DX apuntaría a memoria equivocada y la búsqueda del '$' falla.
+        # El texto coincide con el formato que espera show_result de Fanny.
+        D("    msg_evid_baja DB 13, 10, 'Evidencia: BAJA$'")
+        D("    msg_evid_mod  DB 13, 10, 'Evidencia: MODERADA$'")
+        D("    msg_evid_alta DB 13, 10, 'Evidencia: ALTA$'")
         D("    msg_err_file  DB 'Error abriendo el dataset.', 13, 10, '$'")
 
     # ---------------- pase 2.b: sección CODE ----------------
