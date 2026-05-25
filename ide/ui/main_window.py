@@ -4,6 +4,7 @@ snaptics
 """
 
 from PyQt6 import QtCore, QtWidgets, QtGui
+import os
 import traceback
 import lexer # NO MOVER !!
 import parser as syntax_parser
@@ -454,11 +455,20 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
                         self.last_opt_result = opt_result
                         self._display_ir_optimized(opt_result)
 
+                    # Generación de codigo objeto (.asm para emu8086).
+                    # Se ejecuta solo si la optimizacion fue exitosa.
+                    asm_summary = ""
+                    if opt_result and opt_result.get('success'):
+                        asm_summary = self._generate_asm(text, current_snp_path)
+
                     # Mostrar mensaje en terminal con reporte del optimizador
                     terminal_lines = ["Compilación exitosa"]
                     if opt_result and opt_result.get('success'):
                         terminal_lines.append("")
                         terminal_lines.append(opt_result.get('report', ''))
+                    if asm_summary:
+                        terminal_lines.append("")
+                        terminal_lines.append(asm_summary)
                     self._print_to_terminal("\n".join(terminal_lines))
 
                     # Cambiar automáticamente a la pestaña de IR Optimizada
@@ -486,6 +496,7 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
                         f"• AST generado correctamente\n"
                         f"• Cuádruplas generadas: {num_quads}\n"
                         f"{opt_summary}"
+                        f"{('• ' + asm_summary) if asm_summary else ''}"
                     )
                 
         except Exception as e:
@@ -500,6 +511,44 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
                 "Error Crítico",
                 f"Ocurrió un error inesperado durante la compilación:\n\n{str(e)}"
             )
+
+    def _generate_asm(self, source: str, source_path: str | None) -> str:
+        """Genera el .asm objetivo emu8086 y lo escribe en codegen/build/.
+        Devuelve una linea-resumen para mostrar en el dialogo y la terminal.
+        Cualquier fallo se loggea pero no aborta la compilacion del IDE.
+        """
+        try:
+            from codegen.build import compile_snaptics, _HERE as _CODEGEN_HERE
+            if source_path:
+                basename = os.path.splitext(os.path.basename(source_path))[0]
+            else:
+                basename = 'untitled'
+            result = compile_snaptics(source, source_path=source_path,
+                                      output_basename=basename)
+            if not result.get('ok'):
+                stage = result.get('stage', '?')
+                errs = result.get('errors', [])
+                msg = f"Codegen ({stage}) reporto {len(errs)} error(es). " \
+                      f"Revisa la terminal."
+                # Loguear errores legibles
+                self._print_to_terminal_append(
+                    f"\n[Codegen] etapa '{stage}':\n" +
+                    "\n".join(f"  {e}" for e in errs)
+                )
+                return msg
+
+            build_dir = os.path.join(_CODEGEN_HERE, 'build')
+            os.makedirs(build_dir, exist_ok=True)
+            out_path = os.path.join(build_dir, basename + '.asm')
+            with open(out_path, 'w', encoding='utf-8') as f:
+                f.write(result['asm'])
+
+            return f"ASM generado: {out_path}"
+        except Exception as e:
+            self._print_to_terminal_append(
+                f"\n[Codegen] error inesperado: {e}\n{traceback.format_exc()}"
+            )
+            return f"Codegen fallo: {e}"
 
     def _display_ast(self, ast):
         """Mostrar el AST formateado en un árbol jerárquico."""

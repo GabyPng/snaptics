@@ -1,64 +1,67 @@
-# Importar y preparar el dataset
+# =============================================================
+# alumnosTEC.snp
+# -------------------------------------------------------------
+# Programa de demostración más completo que la demo principal:
+#   - probabilidad simple    P(col < N)
+#   - probabilidad condicional P(A given B)
+#   - filtro WHERE en el dataset
+#   - reglas que comparan facts contra umbrales literales (> 0.30, etc.)
+#   - múltiples queries
+#
+# El CSV asociado es samples/basic/alumnos.csv (3 columnas, sin header):
+#   col 0 = asistencia_porcentaje
+#   col 1 = calificacion_tareas
+#   col 2 = promedio_parcial
+# El SELECT más abajo lista esas tres columnas EN ORDEN, ese es el contrato.
+# Antes de ejecutar, copia el CSV a la ruta del `import from`.
+# =============================================================
 
-dataset alumnos_raw = import from "alumnos.csv"
-dataset ventas_raw = import from "ventas.csv"
+dataset alumnos_raw  = import from "C:\emu8086\vdrive\C\alumnosTEC.csv"
 
-# Estructura esperada del CSV:
-# alumno, asistencia, calificacion, grupo, tareas_completas
-
-#------------------------------------------------------------
-
-dataset alumnos_foco = select asistencia_porcentaje:real, calificacion_tareas:int, promedio_parcial:int
-                        from alumnos_raw
-                        where promedio_parcial < 80
-
-dataset ventas_altas = select producto:string, unidades_vendidas:int
-                        from ventas_raw
-                        where unidades_vendidas > 50
-
-# Hechos
-# P es la proporción de alumnos en el dataset donde la condición es TRUE.
-fact asistencia_critica = P(alumnos_foco.asistencia_porcentaje < 60) 
-
-fact tareas_insuficientes = P(alumnos_foco.calificacion_tareas < 70) 
-
-fact promedio_muy_bajo = P(alumnos_foco.promedio_parcial < 60) 
-
-fact p_reprobacion_dada_asistencia_baja =
-    P(
-        alumnos_foco.promedio_parcial < 60 given
-        alumnos_foco.asistencia_porcentaje < 60
-    )
-
-fact p_reprobacion_dada_tareas_bajas =
-    P(
-        alumnos_foco.promedio_parcial < 60 given
-        alumnos_foco.calificacion_tareas < 70
-    )
+dataset alumnos_foco = select asistencia_porcentaje: int, calificacion_tareas: int, promedio_parcial: int
+                       from alumnos_raw
+                       where promedio_parcial < 80
 
 
-# Reglas de razonamiento probabilístico
+# ---- Hechos: proporciones sobre los alumnos en seguimiento ----
 
-# Regla en caso de que el alumno baje su rendimiento
+fact asistencia_critica   = P(alumnos_foco.asistencia_porcentaje < 60)
+fact tareas_insuficientes = P(alumnos_foco.calificacion_tareas < 70)
+fact promedio_muy_bajo    = P(alumnos_foco.promedio_parcial < 60)
+
+fact p_reprob_dada_asistencia_baja =
+    P(alumnos_foco.promedio_parcial < 60 given alumnos_foco.asistencia_porcentaje < 60)
+
+fact p_reprob_dada_tareas_bajas =
+    P(alumnos_foco.promedio_parcial < 60 given alumnos_foco.calificacion_tareas < 70)
+
+
+# ---- Reglas: razonamiento sobre los hechos ----
+
 rule alerta_general :-
     asistencia_critica > 0.30
     or tareas_insuficientes > 0.40
 
-# Reprobación muy probable si la asistencia es baja y tareas bajas
 rule riesgo_reprobacion_alto :-
-    p_reprobacion_dada_asistencia_baja > 0.60
-    and p_reprobacion_dada_tareas_bajas > 0.50
+    p_reprob_dada_asistencia_baja > 0.60
+    and p_reprob_dada_tareas_bajas > 0.50
 
-# Reprobación moderada si solo asistencia baja
 rule riesgo_reprobacion_moderado :-
-    p_reprobacion_dada_asistencia_baja > 0.40
-    and p_reprobacion_dada_asistencia_baja <= 0.60
+    p_reprob_dada_asistencia_baja > 0.40
+    and p_reprob_dada_asistencia_baja <= 0.60
 
-# Riesgo bajo si asistencia es alta
 rule riesgo_reprobacion_bajo :-
-    p_reprobacion_dada_asistencia_baja < 0.20
+    p_reprob_dada_asistencia_baja < 0.20
 
-# Consulta principal
+
+# ---- Consultas ----
+# alerta_general se consulta en los 3 niveles para demostrar explain/why.
+# Las demás reglas usan solo basic (4 páginas de video disponibles en emu8086).
+# La salida completa se escribe en C:\emu8086\vdrive\C\output\alumnosTEC.txt
+
+query alerta_general
+query alerta_general explain
+query alerta_general why
 
 query riesgo_reprobacion_alto
 query riesgo_reprobacion_moderado

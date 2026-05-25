@@ -71,6 +71,10 @@ no_match_{name}:
     JMP fila_loop_{name}
 
 fin_loop_{name}:
+    ; ---- guardar conteos crudos para explain/why ----
+    MOV fact_{name}_cnt, BX             ; matches
+    MOV fact_{name}_tot, CX             ; total scaneado
+
     ; ---- calcular AX = (matches * 100) / total ----
     OR  CX, CX                          ; si total == 0, evitar div/0
     JZ  div_cero_{name}

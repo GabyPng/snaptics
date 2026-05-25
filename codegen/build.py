@@ -37,25 +37,37 @@ from ir_generator import generate_ir
 from optimizer import optimize_ir
 from code_generator import generate_code
 from count_generator import generate_counts
+from csv_stager import stage_csvs_in_ast
 
 # Las libs de producción viven al lado de este script.
+# explain_helpers va PRIMERO porque output_devices.asm (show_result)
+# llama a print_log_str / print_log_int / nav_pause definidos ahi.
 _LIB_FILES = (
     os.path.join(_HERE, 'lib', 'fuzzy_logic.asm'),
+    os.path.join(_HERE, 'lib', 'explain_helpers.asm'),
     os.path.join(_HERE, 'lib', 'output_devices.asm'),
     os.path.join(_HERE, 'lib', 'primitives.asm'),
 )
 
+# Carpeta donde la VM de emu8086 escribe la transcripcion de los queries.
+# El programa generado abre <OUTPUT_DIR>\<basename>.txt en modo crear.
+_OUTPUT_DIR_HOST = r'C:\emu8086\vdrive\C\output'
+
 
 # ==================== pipeline ====================
 
-def compile_snaptics(source: str, source_path: str | None = None) -> dict:
+def compile_snaptics(source: str, source_path: str | None = None,
+                     output_basename: str | None = None) -> dict:
     """Corre el pipeline completo, devuelve dict con asm y errores.
 
     Args:
-        source:      texto del programa .snp.
-        source_path: ruta del archivo .snp en disco (opcional).
-                     Se usa para resolver rutas relativas en `import from`
-                     al verificar la existencia del CSV (SEM-303).
+        source:          texto del programa .snp.
+        source_path:     ruta del archivo .snp en disco (opcional).
+                         Se usa para resolver rutas relativas en `import from`
+                         al verificar la existencia del CSV (SEM-303).
+        output_basename: nombre (sin extension) para el archivo de log .txt
+                         que el programa generado creara dentro del vdrive
+                         de emu8086. Si es None se usa 'queries'.
     """
     lex = lexer.tokenize(source)
     if lex.get('errors'):
@@ -72,6 +84,13 @@ def compile_snaptics(source: str, source_path: str | None = None) -> dict:
     if sem.get('errors'):
         return {'ok': False, 'stage': 'semantic', 'errors': sem['errors']}
 
+    # Copia cada CSV referenciado al vdrive de emu8086 y reescribe el path
+    # en el AST a la forma DOS que verá el ensamblador. Permite que el .snp
+    # use rutas reales de Windows en cualquier ubicación del disco.
+    stage_errors = stage_csvs_in_ast(pr.get('ast'), source_path)
+    if stage_errors:
+        return {'ok': False, 'stage': 'stage_csv', 'errors': stage_errors}
+
     ir = generate_ir(sem, pr)
     if not ir.get('success'):
         return {'ok': False, 'stage': 'ir', 'errors': ['IR generation failed']}
@@ -80,7 +99,19 @@ def compile_snaptics(source: str, source_path: str | None = None) -> dict:
     if not opt.get('success'):
         return {'ok': False, 'stage': 'opt', 'errors': ['optimizer failed']}
 
-    cg = generate_code(opt, pr)
+    # Aseguramos que la carpeta del log exista en el vdrive del emulador
+    # (la VM la vera como C:\output\). Si no se puede crear no abortamos:
+    # el programa generado intentara crear el archivo y caera al else-branch.
+    try:
+        os.makedirs(_OUTPUT_DIR_HOST, exist_ok=True)
+    except OSError:
+        pass
+
+    log_basename = output_basename or 'queries'
+    # Ruta tal cual la vera el programa generado en runtime (emu8086).
+    log_path = _OUTPUT_DIR_HOST + '\\' + log_basename + '.txt'
+
+    cg = generate_code(opt, pr, output_log_path=log_path)
     if not cg.get('success'):
         return {'ok': False, 'stage': 'codegen', 'errors': cg['errors']}
 
@@ -210,7 +241,8 @@ def main():
         args.output = os.path.join(build_dir, default_name + '.asm')
 
     snp_path = os.path.abspath(args.source) if args.source else None
-    result = compile_snaptics(source, source_path=snp_path)
+    result = compile_snaptics(source, source_path=snp_path,
+                              output_basename=default_name)
     if not result['ok']:
         print(f"[FAIL] etapa '{result['stage']}':")
         for e in result['errors']:

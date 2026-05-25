@@ -1,11 +1,11 @@
 ;========================================
-; Librería de dispositivos de salida
+; Librerï¿½a de dispositivos de salida
 ; output_devices.asm
 ;========================================
 
 ;---- Puertos ----
 LED_PORT     EQU 199      ; Puerto del LED display
-TRAFFIC_PORT EQU 4        ; Puerto del semáforo
+TRAFFIC_PORT EQU 4        ; Puerto del semï¿½foro
 
 ;---- Mensajes ----
 msg_evid_baja DB 13,10,'Evidencia: BAJA$'
@@ -14,7 +14,7 @@ msg_evid_alta DB 13,10,'Evidencia: ALTA$'
 
 ;--------------------------------------------------
 ; print_int
-; Entrada : AX = número a imprimir (0-100)
+; Entrada : AX = nï¿½mero a imprimir (0-100)
 
 print_int PROC NEAR
 
@@ -26,20 +26,20 @@ print_int PROC NEAR
     PUSH DI
 
     MOV BX, 10             ; Divisor decimal
-    XOR CX, CX             ; Contador de dígitos
+    XOR CX, CX             ; Contador de dï¿½gitos
 
 pi_apilar:
     XOR DX, DX             ; Limpiar DX antes de DIV
     DIV BX                 ; AX = cociente, DX = residuo
-    PUSH DX                ; Guardar dígito
+    PUSH DX                ; Guardar dï¿½gito
     INC CX                 ; Incrementar contador
-    OR AX, AX              ; ¿AX es 0?
+    OR AX, AX              ; ï¿½AX es 0?
     JNZ pi_apilar          ; Si no, continuar
 
 pi_imprimir:
-    POP DX                 ; Recuperar dígito
+    POP DX                 ; Recuperar dï¿½gito
     ADD DL, '0'            ; Convertir a ASCII
-    MOV AH, 02h            ; INT 21h -> imprimir carácter
+    MOV AH, 02h            ; INT 21h -> imprimir carï¿½cter
     INT 21h
     LOOP pi_imprimir
 
@@ -56,7 +56,7 @@ print_int ENDP
 
 ;-------------------------------------
 ; show_led
-; Entrada : AX = número a mostrar
+; Entrada : AX = nï¿½mero a mostrar
 
 show_led PROC NEAR
 
@@ -66,7 +66,7 @@ show_led PROC NEAR
     PUSH SI
     PUSH DI
 
-    ; Enviar número al LED display
+    ; Enviar nï¿½mero al LED display
     OUT LED_PORT, AX
 
     ; Restaurar registros
@@ -92,27 +92,30 @@ show_traffic PROC NEAR
     PUSH SI
     PUSH DI
 
-    ; Determinar color según probabilidad
+    ; Determinar color segun probabilidad, interpretada como NIVEL DE ALERTA:
+    ;   0..32   verde   (sin alerta)
+    ;   33..65  amarillo (alerta moderada)
+    ;   66..100 rojo    (alerta alta)
     CMP AX, 33
-    JB  st_rojo
+    JB  st_verde
 
     CMP AX, 66
     JB  st_amarillo
 
-    ; AX >= 66 -> verde
-st_verde:
-    MOV AX, 0004h
+    ; AX >= 66 -> rojo (cae por fallthrough al primer label de abajo)
+st_rojo:
+    MOV AX, 0001h
     JMP st_out
 
 st_amarillo:
     MOV AX, 0002h
     JMP st_out
 
-st_rojo:
-    MOV AX, 0001h
+st_verde:
+    MOV AX, 0004h
 
 st_out:
-    ; Enviar valor al semáforo
+    ; Enviar valor al semaforo
     OUT TRAFFIC_PORT, AX
 
     ; Restaurar registros
@@ -143,20 +146,18 @@ show_result PROC NEAR
 
     MOV BX, AX             ; Guardar probabilidad
 
-    ;---- Imprimir nombre de la query ----
-    MOV DX, SI
-    MOV AH, 09h
-    INT 21h                ; Imprime hasta encontrar '$'
+    ;---- Imprimir nombre de la query (a pantalla + log) ----
+    CALL print_log_str     ; SI ya apunta a msg_<query>
 
     ;---- Imprimir probabilidad ----
     MOV AX, BX
-    CALL print_int
+    CALL print_log_int
 
     ;---- Mostrar en LED display ----
     MOV AX, BX
     CALL show_led
 
-    ;---- Mostrar semáforo ----
+    ;---- Mostrar semï¿½foro ----
     MOV AX, BX
     CALL show_traffic
 
@@ -169,21 +170,23 @@ show_result PROC NEAR
 
     ; Evidencia alta
 sr_alta:
-    MOV DX, OFFSET msg_evid_alta
+    LEA SI, msg_evid_alta
     JMP sr_print
 
     ; Evidencia moderada
 sr_mod:
-    MOV DX, OFFSET msg_evid_mod
+    LEA SI, msg_evid_mod
     JMP sr_print
 
     ; Evidencia baja
 sr_baja:
-    MOV DX, OFFSET msg_evid_baja
+    LEA SI, msg_evid_baja
 
 sr_print:
-    MOV AH, 09h
-    INT 21h
+    CALL print_log_str
+
+    ;---- Pausa con navegacion por flechas ----
+    CALL nav_pause
 
     ; Restaurar registros
     POP DI

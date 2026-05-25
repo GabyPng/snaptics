@@ -14,6 +14,8 @@ include Biblioteca.lib
 
     ; -- Facts derivados del dataset (los llena count_<fact>) --
     fact_altas            DW 0    ; P(monto > 500)
+    fact_altas_cnt DW 0    ; matches
+    fact_altas_tot DW 0    ; total considerado
 
     ; -- Resultado de evaluación de cada regla --
     rule_alerta           DW 0
@@ -28,16 +30,31 @@ include Biblioteca.lib
     ; -- Mensajes de queries (consumidos por show_result) --
     msg_alerta           DB 'alerta = $'
 
-    msg_evid_baja DB 13, 10, 'Evidencia: BAJA$'
-    msg_evid_mod  DB 13, 10, 'Evidencia: MODERADA$'
-    msg_evid_alta DB 13, 10, 'Evidencia: ALTA$'
+    msg_evid_baja DB 13, 10, 'Evidencia: BAJA', 13, 10, '$'
+    msg_evid_mod  DB 13, 10, 'Evidencia: MODERADA', 13, 10, '$'
+    msg_evid_alta DB 13, 10, 'Evidencia: ALTA', 13, 10, '$'
+    msg_continuar DB 13, 10, '>> Presiona una tecla para continuar...', 13, 10, 13, 10, '$'
     msg_err_file  DB 'Error abriendo el dataset.', 13, 10, '$'
+
+    ; -- Logging a archivo y paginacion por flechas --
+    OUTPUT_PATH  DB 'C:\emu8086\vdrive\C\output\queries.txt', 0
+    LOG_HANDLE   DW 0
+    cur_page     DB 0
+    max_page     DB 0
+    nav_prompt   DB 13, 10, '>> Flechas: <- anterior, -> siguiente, ESC para salir', 13, 10, '$'
+    itoa_buf     DB '       ', '$', 0  ; espacio para hasta 6 digitos + '$'
+    msg_true     DB ' SE CUMPLE', 13, 10, '$'
+    msg_false    DB ' NO SE CUMPLE', 13, 10, '$'
+
 
 .CODE
 INICIO:
     MOV AX, @DATA
     MOV DS, AX
     MOV ES, AX
+
+    ; ---- Abrir archivo de log (queries -> .txt) ----
+    CALL open_log_file
 
     ; ---- Apertura y lectura del CSV ----
     abrirArchivo 2, RUTA          ; modo 2 = lectura/escritura
@@ -83,10 +100,19 @@ cmp_d_1:
     MOV AX, t4
     MOV rule_alerta, AX
 
-    ; query alerta
+    ; --- pantalla 0 (pagina 0) query alerta [basic] ---
+    MOV AL, 0
+    CALL switch_to_page
+
+    ; query alerta (basico)
     MOV AX, rule_alerta
     LEA SI, msg_alerta
     CALL show_result
+
+    ; ---- Navegacion libre por flechas tras los queries ----
+    MOV BYTE PTR max_page, 0
+    CALL final_nav_loop
+    CALL close_log_file
 
     JMP fin
 

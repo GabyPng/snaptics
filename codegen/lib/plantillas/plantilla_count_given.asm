@@ -103,6 +103,10 @@ no_b_{name}:
     JMP fila_loop_{name}
 
 fin_loop_{name}:
+    ; ---- guardar conteos crudos para explain/why ----
+    MOV fact_{name}_cnt, CX             ; numerador (A AND B)
+    MOV fact_{name}_tot, BX             ; denominador (B)
+
     ; ---- calcular AX = (numerador * 100) / denominador ----
     OR  BX, BX                          ; si denominador == 0, evitar div/0
     JZ  div_cero_{name}

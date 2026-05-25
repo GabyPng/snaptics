@@ -1,0 +1,11 @@
+dataset alumnos_raw  = import from "C:\emu8086\vdrive\C\alumnos.csv"
+dataset alumnos_foco = select alumno: int, asistencia: int, calificacion: int,
+                              grupo: int, tareas: int, promedio: int
+                       from alumnos_raw
+                       where promedio < 80
+
+fact asistencia_critica = P(alumnos_foco.asistencia < 60)
+
+query asistencia_critica
+query asistencia_critica explain
+query asistencia_critica why

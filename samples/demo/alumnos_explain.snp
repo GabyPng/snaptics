@@ -1,0 +1,14 @@
+dataset alumnos_raw  = import from "C:\emu8086\vdrive\C\alumnos.csv"
+dataset alumnos_foco = select alumno: int, asistencia: int, calificacion: int,
+                              grupo: int, tareas: int, promedio: int
+                       from alumnos_raw
+                       where promedio < 80
+
+fact asistencia_critica  = P(alumnos_foco.asistencia < 60)
+fact tareas_insuficientes = P(alumnos_foco.calificacion < 70)
+
+rule alerta_general :- asistencia_critica > 0.30 or tareas_insuficientes > 0.40
+
+query alerta_general
+query alerta_general explain
+query alerta_general why

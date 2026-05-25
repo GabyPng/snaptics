@@ -123,10 +123,12 @@ class IRGenerator(ASTVisitor):
         self.emit('RULE_DEF', cond_result, None, rule_id)
 
     def visit_Consulta(self, node: ASTNode):
-        """query id [explain]"""
+        """query id [explain | why]"""
         query_id = node.properties.get('query_id')
         explain = node.properties.get('explicacion')
-        if explain:
+        if explain == 'why':
+            self.emit('QUERY_WHY', query_id, None, None)
+        elif explain == 'explain':
             self.emit('QUERY_EXPLAIN', query_id, None, None)
         else:
             self.emit('QUERY', query_id, None, None)

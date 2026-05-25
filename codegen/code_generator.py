@@ -19,7 +19,11 @@ Soportado:
     - facts con probabilidad condicional:  fact x = P(A given B)
     - reglas con and / or / not        (incluido anidamiento)
     - reglas con comparación contra literal (fact > 0.30)
-    - queries
+    - queries (basic, explain, why)    — explain/why emiten pantallas extra
+                                          con desglose tecnico y razonamiento
+                                          causal
+    - paginacion + navegacion por flechas (← anterior, → siguiente, ESC sale)
+    - export del log de queries a un .txt en C:\emu8086\vdrive\C\output\
     - import de un dataset CSV         (parsing en runtime via Biblioteca.lib)
     - select ... where condicion       (filtra dataset; el where se inyecta como
                                         pre-check en cada count_<fact> del dataset)
@@ -27,7 +31,6 @@ Soportado:
 NO soportado (se reporta como error de generación):
     - mean / var / std / correlation
     - auto_discover
-    - query ... explain | why
     - aritmética dentro de expresiones probabilísticas
 
 CONVENCIÓN DE REGISTROS (acordada con el equipo)
@@ -78,10 +81,13 @@ _COMPARE_OPS = {'GT', 'LT', 'EQ', 'NEQ', 'LEQ', 'GEQ'}
 # Operaciones declaradas explícitamente fuera de alcance v1
 _UNSUPPORTED_OPS = {
     'MEAN', 'VARIANCE', 'STDDEV', 'CORRELATION',
-    'AUTO_DISCOVER', 'QUERY_EXPLAIN',
+    'AUTO_DISCOVER',
     'ADD', 'SUB', 'MUL', 'DIV', 'POW',
     'UNARY_MINUS', 'UNARY_PLUS',
 }
+
+# Ruta default del archivo .txt que el programa escribe en runtime.
+DEFAULT_LOG_PATH = r'C:\emu8086\vdrive\C\output\queries.txt'
 
 # Operaciones que el codegen acepta pero NO traduce a asm:
 #   - SELECT: solo declara columnas (metadatos para el semantic/IR);
@@ -124,9 +130,11 @@ class CodeGenError(Exception):
 class CodeGenerator:
     """Genera código objeto 8086 (sintaxis emu8086) a partir de IR optimizada."""
 
-    def __init__(self, symbol_table=None, dataset_path: str | None = None):
+    def __init__(self, symbol_table=None, dataset_path: str | None = None,
+                 output_log_path: str | None = None):
         self.symbol_table = symbol_table
         self.dataset_path = dataset_path or DEFAULT_DATASET_PATH
+        self.output_log_path = output_log_path or DEFAULT_LOG_PATH
 
         # Estado por compilación
         self.quads: list[Quadruple] = []
@@ -140,7 +148,10 @@ class CodeGenerator:
         #                         dataset, kind: 'given'}
         self.facts_derived: dict[str, dict] = {}
         self.rules: list[str] = []                    # nombres de reglas en orden
-        self.queries: list[str] = []                  # targets de query en orden
+        # queries: lista de tuplas (nombre, nivel). nivel in {basic,explain,why}.
+        self.queries: list[tuple[str, str]] = []
+        # rule_name -> arbol estructural (para explain/why)
+        self.rule_structures: dict[str, dict] = {}
         self.temps: set[str] = set()                  # tN que requieren slot DW
         self.datasets: dict[str, str] = {}            # dataset_id -> ruta de archivo (raíz)
         # Datasets derivados de un select+where:
@@ -157,6 +168,12 @@ class CodeGenerator:
         self.absorbed_cmp_temps: set[str] = set()
         # Contador para etiquetas únicas en comparaciones dentro de reglas.
         self._cmp_label_counter = 0
+        # Contador de pantallas emitidas (cada query+nivel = 1 pantalla).
+        self._screen_counter = 0
+        # Contador de mensajes auxiliares para explain/why (labels unicos).
+        self._aux_msg_counter = 0
+        # Mensajes auxiliares emitidos por explain/why: lista de (label, db_line)
+        self._aux_msgs: list[tuple[str, str]] = []
 
         # Buffers de salida
         self._data_lines: list[str] = []
@@ -168,8 +185,11 @@ class CodeGenerator:
         """Genera el .asm completo a partir de la IR optimizada."""
         self._reset(quadruples)
         self._analyze()
-        self._emit_data()
+        # OJO: el codigo emite primero porque registra mensajes auxiliares
+        # (DB '...') de explain/why en self._aux_msgs, y esos mensajes deben
+        # aparecer en la seccion .DATA emitida despues.
         self._emit_code()
+        self._emit_data()
         return self._assemble()
 
     def derived_facts_metadata(self) -> dict:
@@ -223,6 +243,7 @@ class CodeGenerator:
         self.facts_derived = {}
         self.rules = []
         self.queries = []
+        self.rule_structures = {}
         self.temps = set()
         self.datasets = {}
         self.datasets_with_filter = {}
@@ -230,6 +251,9 @@ class CodeGenerator:
         self.column_datasets = {}
         self.absorbed_cmp_temps = set()
         self._cmp_label_counter = 0
+        self._screen_counter = 0
+        self._aux_msg_counter = 0
+        self._aux_msgs = []
         self._data_lines = []
         self._code_lines = []
 
@@ -289,11 +313,26 @@ class CodeGenerator:
             if op == 'RULE_DEF':
                 if isinstance(q.result, str):
                     self.rules.append(q.result)
+                    # Reconstruir el arbol estructural de la regla
+                    # caminando hacia atras desde el temp asignado.
+                    self.rule_structures[q.result] = (
+                        self._build_rule_tree(q.arg1, i)
+                    )
                 continue
 
             if op == 'QUERY':
                 if isinstance(q.arg1, str):
-                    self.queries.append(q.arg1)
+                    self.queries.append((q.arg1, 'basic'))
+                continue
+
+            if op == 'QUERY_EXPLAIN':
+                if isinstance(q.arg1, str):
+                    self.queries.append((q.arg1, 'explain'))
+                continue
+
+            if op == 'QUERY_WHY':
+                if isinstance(q.arg1, str):
+                    self.queries.append((q.arg1, 'why'))
                 continue
 
             if op in _LOGIC_OPS or op in _COMPARE_OPS or op in ('PROB', 'PROB_GIVEN'):
@@ -460,11 +499,210 @@ class CodeGenerator:
                 return
         # Si no hay FILTER, no es un dataset filtrado; nada que hacer.
 
+    def _build_rule_tree(self, value, end_idx: int) -> dict:
+        """Reconstruye el arbol AST de una regla caminando hacia atras
+        por la IR. Devuelve un dict con 'kind' in {'logic','cmp','fact_ref','literal','unknown'}.
+        """
+        # Si es un literal numerico / booleano, devolverlo
+        if isinstance(value, (int, float)):
+            return {'kind': 'literal', 'value': value}
+        if not isinstance(value, str):
+            return {'kind': 'unknown', 'value': value}
+
+        # Si NO es un temporal tN, debe ser un nombre (fact, rule, columna, etc.)
+        if not (value.startswith('t') and value[1:].isdigit()):
+            cat = self._category(value)
+            if cat == 'fact':
+                return {'kind': 'fact_ref', 'name': value}
+            if cat == 'rule':
+                return {'kind': 'rule_ref', 'name': value}
+            return {'kind': 'name', 'value': value}
+
+        # Es un temp -- buscar el quad que lo produce
+        for j in range(end_idx - 1, -1, -1):
+            q = self.quads[j]
+            if q.result != value:
+                continue
+            if q.op in ('AND', 'OR'):
+                return {
+                    'kind': 'logic',
+                    'op': q.op,
+                    'left':  self._build_rule_tree(q.arg1, j),
+                    'right': self._build_rule_tree(q.arg2, j),
+                }
+            if q.op == 'NOT':
+                return {
+                    'kind': 'logic',
+                    'op': 'NOT',
+                    'operand': self._build_rule_tree(q.arg1, j),
+                }
+            if q.op in _CMP_OP_INFO:
+                _, _, sym = _CMP_OP_INFO[q.op]
+                return {
+                    'kind': 'cmp',
+                    'op': q.op,
+                    'sym': sym,
+                    'left':  self._build_rule_tree(q.arg1, j),
+                    'right': self._build_rule_tree(q.arg2, j),
+                }
+            if q.op == 'ASSIGN':
+                return self._build_rule_tree(q.arg1, j)
+            # PROB, PROB_GIVEN, etc. no aparecen en arbol de reglas
+            break
+        return {'kind': 'unknown', 'value': value}
+
     def _category(self, name: str) -> str | None:
         if self.symbol_table is None or not isinstance(name, str):
             return None
         sym = self.symbol_table.get(name)
         return sym.category if sym else None
+
+    # ---------------- helpers de explain / why ----------------
+
+    @staticmethod
+    def _fmt_threshold(node: dict) -> str:
+        """Da formato a un nodo literal/name de umbral para mostrarlo."""
+        if not isinstance(node, dict):
+            return '?'
+        kind = node.get('kind')
+        if kind == 'literal':
+            v = node.get('value')
+            if isinstance(v, float):
+                # Mostramos como porcentaje 0..100 si parece probabilidad
+                if 0.0 <= v <= 1.0:
+                    return f"{int(round(v * 100))}"
+                return f"{v}"
+            return f"{v}"
+        if kind == 'fact_ref':
+            return node.get('name', '?')
+        if kind == 'name':
+            return str(node.get('value', '?'))
+        return '?'
+
+    def _serialize_rule_expr(self, tree: dict) -> str:
+        """Convierte el arbol de una regla en texto legible."""
+        if not isinstance(tree, dict):
+            return '?'
+        kind = tree.get('kind')
+        if kind == 'logic':
+            op = tree.get('op')
+            if op == 'NOT':
+                return f"not {self._serialize_rule_expr(tree.get('operand', {}))}"
+            left  = self._serialize_rule_expr(tree.get('left', {}))
+            right = self._serialize_rule_expr(tree.get('right', {}))
+            sym = {'AND': 'and', 'OR': 'or'}.get(op, op.lower() if op else '?')
+            return f"({left} {sym} {right})"
+        if kind == 'cmp':
+            left  = self._serialize_rule_expr(tree.get('left', {}))
+            right = self._fmt_threshold(tree.get('right', {}))
+            return f"{left} {tree.get('sym','?')} {right}"
+        if kind == 'fact_ref':
+            return tree.get('name', '?')
+        if kind == 'rule_ref':
+            return tree.get('name', '?')
+        if kind == 'literal':
+            return self._fmt_threshold(tree)
+        if kind == 'name':
+            return str(tree.get('value', '?'))
+        return '?'
+
+    def _collect_cmps(self, tree: dict, out: list[dict]):
+        """Recoge nodos de comparacion (fact > umbral) en orden in-order."""
+        if not isinstance(tree, dict):
+            return
+        kind = tree.get('kind')
+        if kind == 'logic':
+            if tree.get('op') == 'NOT':
+                self._collect_cmps(tree.get('operand', {}), out)
+            else:
+                self._collect_cmps(tree.get('left', {}), out)
+                self._collect_cmps(tree.get('right', {}), out)
+        elif kind == 'cmp':
+            out.append(tree)
+
+    def _collect_fact_refs(self, tree: dict, out: list[str]):
+        """Recoge nombres de facts referenciados (en orden, sin duplicados)."""
+        if not isinstance(tree, dict):
+            return
+        kind = tree.get('kind')
+        if kind == 'logic':
+            if tree.get('op') == 'NOT':
+                self._collect_fact_refs(tree.get('operand', {}), out)
+            else:
+                self._collect_fact_refs(tree.get('left', {}), out)
+                self._collect_fact_refs(tree.get('right', {}), out)
+        elif kind == 'cmp':
+            self._collect_fact_refs(tree.get('left', {}), out)
+            self._collect_fact_refs(tree.get('right', {}), out)
+        elif kind == 'fact_ref':
+            name = tree.get('name')
+            if name and name not in out:
+                out.append(name)
+
+    def _new_msg_label(self) -> str:
+        label = f"em{self._aux_msg_counter}"
+        self._aux_msg_counter += 1
+        return label
+
+    @staticmethod
+    def _quote_asm_text(text: str) -> str:
+        """Convierte un texto Python a una lista de tokens DB que emu8086
+        sabe interpretar. Se separan comillas embebidas si las hubiera.
+        """
+        if "'" in text:
+            text = text.replace("'", "`")
+        return f"'{text}'"
+
+    def _emit_msg(self, text: str, newline: bool = False) -> str:
+        """Reserva una etiqueta unica en .DATA con el texto + '$'.
+        Si `text` contiene '\\n', cada salto se traduce a CRLF (13,10) entre
+        fragmentos DB. Si newline=True, agrega un CRLF extra antes del '$'.
+        Devuelve el label.
+        """
+        label = self._new_msg_label()
+        parts: list[str] = []
+        if text:
+            segments = text.split('\n')
+            for i, seg in enumerate(segments):
+                if seg:
+                    parts.append(self._quote_asm_text(seg))
+                if i < len(segments) - 1:
+                    parts.append('13')
+                    parts.append('10')
+        if newline:
+            parts.append('13')
+            parts.append('10')
+        parts.append("'$'")
+        db_line = f"    {label:<10} DB {', '.join(parts)}"
+        self._aux_msgs.append((label, db_line))
+        return label
+
+    @staticmethod
+    def _entity_noun(dataset_name: str | None) -> str:
+        """Sustantivo generico para hablar de las filas del dataset en el
+        razonamiento. Si el nombre tiene underscore tomamos el primer
+        segmento ('alumnos_foco' -> 'alumnos'); si no, devolvemos
+        'registros' como palabra neutra.
+        """
+        if not isinstance(dataset_name, str) or not dataset_name:
+            return 'registros'
+        head = dataset_name.split('_', 1)[0]
+        return head if head else 'registros'
+
+    def _fact_cond_text(self, meta: dict) -> str:
+        """Texto puro de la condicion '<col> <op> <value>' (sin 'P(...)')."""
+        kind = meta.get('kind', 'simple')
+        if kind == 'given':
+            a = f"{meta.get('col_a','?')} {meta.get('op_a','?')} {meta.get('value_a','?')}"
+            b = f"{meta.get('col_b','?')} {meta.get('op_b','?')} {meta.get('value_b','?')}"
+            return f"{a} dado {b}"
+        return f"{meta.get('col','?')} {meta.get('op','?')} {meta.get('value','?')}"
+
+    def _fact_cond_a(self, meta: dict) -> str:
+        return f"{meta.get('col_a','?')} {meta.get('op_a','?')} {meta.get('value_a','?')}"
+
+    def _fact_cond_b(self, meta: dict) -> str:
+        return f"{meta.get('col_b','?')} {meta.get('op_b','?')} {meta.get('value_b','?')}"
 
     def _describe_fact(self, meta: dict) -> str:
         """Comentario legible para un fact, usado en .DATA y .CODE."""
@@ -513,6 +751,11 @@ class CodeGenerator:
             D("    ; -- Facts derivados del dataset (los llena count_<fact>) --")
             for name, meta in self.facts_derived.items():
                 D(f"    fact_{name:<16} DW 0    ; {self._describe_fact(meta)}")
+                # Conteos crudos usados por explain/why para la 'lectura'
+                # natural: cnt = filas que cumplen, tot = filas evaluadas
+                # (para 'given', cnt = A AND B, tot = B).
+                D(f"    fact_{name}_cnt DW 0    ; matches")
+                D(f"    fact_{name}_tot DW 0    ; total considerado")
             D("")
 
         if self.rules:
@@ -529,7 +772,14 @@ class CodeGenerator:
 
         if self.queries:
             D("    ; -- Mensajes de queries (consumidos por show_result) --")
-            for name in self.queries:
+            # Solo emitir una vez por nombre aunque haya varios niveles
+            # (basic/explain/why) sobre el mismo query; preservamos el
+            # orden de aparicion para que el .asm sea determinista.
+            seen: set[str] = set()
+            for name, _level in self.queries:
+                if name in seen:
+                    continue
+                seen.add(name)
                 D(f"    msg_{name:<16} DB '{name} = $'")
             D("")
 
@@ -538,10 +788,36 @@ class CodeGenerator:
         # en CODE (que es donde está output_devices.asm tras el include),
         # DS:DX apuntaría a memoria equivocada y la búsqueda del '$' falla.
         # El texto coincide con el formato que espera show_result de Fanny.
-        D("    msg_evid_baja DB 13, 10, 'Evidencia: BAJA$'")
-        D("    msg_evid_mod  DB 13, 10, 'Evidencia: MODERADA$'")
-        D("    msg_evid_alta DB 13, 10, 'Evidencia: ALTA$'")
+        # CRLF al inicio Y al final para que con múltiples queries cada
+        # resultado quede en su propia línea (sin pegarse con el siguiente).
+        D("    msg_evid_baja DB 13, 10, 'Evidencia: BAJA', 13, 10, '$'")
+        D("    msg_evid_mod  DB 13, 10, 'Evidencia: MODERADA', 13, 10, '$'")
+        D("    msg_evid_alta DB 13, 10, 'Evidencia: ALTA', 13, 10, '$'")
+        # Prompt para pausar entre queries y dar tiempo a ver el LED+semáforo.
+        # show_result lo imprime y espera una tecla con INT 21h/AH=07h.
+        # CRLF al principio Y dos al final → el prompt queda con una línea
+        # en blanco arriba y otra abajo, separando visualmente cada bloque
+        # de query cuando hay varios.
+        D("    msg_continuar DB 13, 10, '>> Presiona una tecla para continuar...', 13, 10, 13, 10, '$'")
         D("    msg_err_file  DB 'Error abriendo el dataset.', 13, 10, '$'")
+        D("")
+        D("    ; -- Logging a archivo y paginacion por flechas --")
+        D(f"    OUTPUT_PATH  DB '{self.output_log_path}', 0")
+        D("    LOG_HANDLE   DW 0")
+        D("    cur_page     DB 0")
+        D("    max_page     DB 0")
+        D("    nav_prompt   DB 13, 10, '>> Flechas: <- anterior, -> siguiente, ESC para salir', 13, 10, '$'")
+        D("    itoa_buf     DB '       ', '$', 0  ; espacio para hasta 6 digitos + '$'")
+        D("    msg_true     DB ' SE CUMPLE', 13, 10, '$'")
+        D("    msg_false    DB ' NO SE CUMPLE', 13, 10, '$'")
+        D("")
+
+        # Mensajes auxiliares para explain/why (generados por los emisores).
+        if self._aux_msgs:
+            D("    ; -- Mensajes para explain/why --")
+            for _, line in self._aux_msgs:
+                D(line)
+            D("")
 
     # ---------------- pase 2.b: sección CODE ----------------
 
@@ -553,6 +829,11 @@ class CodeGenerator:
                 self._code_lines.append(s)
             else:
                 self._code_lines.append("    " + s if s else "")
+
+        # 0) Abrir archivo de log para escribir los queries en disco
+        C("; ---- Abrir archivo de log (queries -> .txt) ----")
+        C("CALL open_log_file")
+        C("")
 
         # 1) Si hay dataset y facts derivados, abrir/leer el archivo y calcular cada fact
         if self.facts_derived:
@@ -578,6 +859,20 @@ class CodeGenerator:
             for line in block:
                 C(line)
 
+        # 3) Despues del ultimo screen: max_page = el indice de la ultima
+        #    pagina que de verdad tiene contenido (acotado a 3 porque solo
+        #    hay 4 paginas; con mas screens estas se sobrescriben en wrap,
+        #    pero el .txt log conserva todo).
+        if self._screen_counter == 0:
+            max_page = 0
+        else:
+            max_page = min(self._screen_counter - 1, 3)
+        C("; ---- Navegacion libre por flechas tras los queries ----")
+        C(f"MOV BYTE PTR max_page, {max_page}")
+        C("CALL final_nav_loop")
+        C("CALL close_log_file")
+        C("")
+
     def _emit_quad(self, q: Quadruple, idx: int) -> list[str] | None:
         op = q.op
 
@@ -590,7 +885,11 @@ class CodeGenerator:
         if op == 'RULE_DEF':
             return self._emit_rule_def(q)
         if op == 'QUERY':
-            return self._emit_query(q)
+            return self._emit_query(q, level='basic')
+        if op == 'QUERY_EXPLAIN':
+            return self._emit_query(q, level='explain')
+        if op == 'QUERY_WHY':
+            return self._emit_query(q, level='why')
         if op == 'ASSIGN':
             return self._emit_assign(q)
 
@@ -633,20 +932,541 @@ class CodeGenerator:
             "",
         ]
 
-    def _emit_query(self, q: Quadruple) -> list[str]:
+    def _emit_query(self, q: Quadruple, level: str = 'basic') -> list[str]:
         target = q.arg1
-        category = self._category(target)
-        if category == 'rule':
-            slot = f"rule_{target}"
-        else:
-            slot = f"fact_{target}"
+        # Paginacion: cada pantalla (basic/explain/why) ocupa su propia
+        # pagina; con wrap 0..3 cuando hay mas pantallas que paginas
+        # disponibles. El .txt log siempre captura todo.
+        page = self._screen_counter % 4
+        self._screen_counter += 1
+
+        page_prefix = [
+            f"; --- pantalla {self._screen_counter - 1} (pagina {page}) "
+            f"query {target} [{level}] ---",
+            f"MOV AL, {page}",
+            "CALL switch_to_page",
+            "",
+        ]
+
+        if level == 'explain':
+            return page_prefix + self._emit_explain_body(target)
+        if level == 'why':
+            return page_prefix + self._emit_why_body(target)
+        return page_prefix + self._emit_basic_body(target)
+
+    # ---- emisores de las tres pantallas ----
+
+    def _emit_basic_body(self, target: str) -> list[str]:
+        slot = self._slot_of(target)
         return [
-            f"; query {target}",
+            f"; query {target} (basico)",
             f"MOV AX, {slot}",
             f"LEA SI, msg_{target}",
             "CALL show_result",
             "",
         ]
+
+    def _slot_of(self, target: str) -> str:
+        cat = self._category(target)
+        if cat == 'rule':
+            return f"rule_{target}"
+        return f"fact_{target}"
+
+    def _emit_print_str(self, label: str) -> list[str]:
+        return [f"LEA SI, {label}", "CALL print_log_str"]
+
+    def _emit_print_int(self, slot: str) -> list[str]:
+        return [f"MOV AX, {slot}", "CALL print_log_int"]
+
+    # ---- helpers compartidos por explain / why ----
+
+    def _emit_fact_lectura(self, fname: str, meta: dict,
+                           indent: str = '   ') -> list[str]:
+        """Imprime el bloque 'lectura' de un fact en runtime.
+
+        Forma simple ('fact = P(col op val)'):
+            <fact> = <pct>%
+              <cnt> de <tot> <entidad> de <dataset>
+              cumplen <col> <op> <val>.
+
+        Forma 'given' (P(A given B)):
+            <fact> = <pct>%
+              de los <tot> <entidad> con <B>,
+              <cnt> tambien cumplen <A>.
+        """
+        lines: list[str] = []
+        kind = meta.get('kind', 'simple')
+        dataset = meta.get('dataset') or ''
+        entidad = self._entity_noun(dataset)
+        ds_phrase = f" de {dataset}" if dataset else ''
+
+        # Linea 1: "<fact> = <pct>%"
+        head = self._emit_msg(f'{indent}{fname} = ', newline=False)
+        tail = self._emit_msg('%', newline=True)
+        lines.extend(self._emit_print_str(head))
+        lines.extend(self._emit_print_int(f'fact_{fname}'))
+        lines.extend(self._emit_print_str(tail))
+
+        if kind == 'given':
+            cond_a = self._fact_cond_a(meta)
+            cond_b = self._fact_cond_b(meta)
+            lectura_head = self._emit_msg(
+                f'{indent}  de los ', newline=False
+            )
+            lectura_mid = self._emit_msg(
+                f' {entidad}{ds_phrase} con {cond_b},', newline=True
+            )
+            lectura_cnt_pre = self._emit_msg(
+                f'{indent}  ', newline=False
+            )
+            lectura_tail = self._emit_msg(
+                f' tambien cumplen {cond_a}.', newline=True
+            )
+            lines.extend(self._emit_print_str(lectura_head))
+            lines.extend(self._emit_print_int(f'fact_{fname}_tot'))
+            lines.extend(self._emit_print_str(lectura_mid))
+            lines.extend(self._emit_print_str(lectura_cnt_pre))
+            lines.extend(self._emit_print_int(f'fact_{fname}_cnt'))
+            lines.extend(self._emit_print_str(lectura_tail))
+        else:
+            cond = self._fact_cond_text(meta)
+            lectura_head = self._emit_msg(
+                f'{indent}  ', newline=False
+            )
+            lectura_mid = self._emit_msg(
+                f' de ', newline=False
+            )
+            lectura_tail = self._emit_msg(
+                f' {entidad}{ds_phrase} cumplen {cond}.', newline=True
+            )
+            lines.extend(self._emit_print_str(lectura_head))
+            lines.extend(self._emit_print_int(f'fact_{fname}_cnt'))
+            lines.extend(self._emit_print_str(lectura_mid))
+            lines.extend(self._emit_print_int(f'fact_{fname}_tot'))
+            lines.extend(self._emit_print_str(lectura_tail))
+        return lines
+
+    def _emit_cmp_eval(self, fact_name: str, sym: str, threshold: str,
+                       ir_op: str, indent: str = '   ') -> list[str]:
+        """Imprime '<fact> = <val>% (umbral <sym> <th>%) -> SE CUMPLE/NO SE CUMPLE'
+        decidiendo en runtime cual de los dos imprimir.
+        """
+        true_jmp = _CMP_OP_INFO.get(ir_op, ('JE', 'JNE', sym))[0]
+        label_id = self._cmp_label_counter
+        self._cmp_label_counter += 1
+        label_true = f"xt_{label_id}"
+        label_done = f"xd_{label_id}"
+
+        head = self._emit_msg(f'{indent}{fact_name} = ', newline=False)
+        mid  = self._emit_msg(f'% (umbral {sym} {threshold}%) ->', newline=False)
+        lines: list[str] = []
+        lines.extend(self._emit_print_str(head))
+        lines.extend(self._emit_print_int(f'fact_{fact_name}'))
+        lines.extend(self._emit_print_str(mid))
+        # Decision runtime: TRUE vs FALSE
+        lines.append(f"MOV AX, fact_{fact_name}")
+        lines.append(f"CMP AX, {threshold}")
+        lines.append(f"{true_jmp} {label_true}")
+        lines.append("LEA SI, msg_false")
+        lines.append("CALL print_log_str")
+        lines.append(f"JMP {label_done}")
+        lines.append(f"{label_true}:")
+        lines.append("LEA SI, msg_true")
+        lines.append("CALL print_log_str")
+        lines.append(f"{label_done}:")
+        return lines
+
+    def _emit_explain_body(self, target: str) -> list[str]:
+        """Pantalla 'explain': desglose tecnico del query.
+
+        Diseno (independiente del dominio del dataset; todo el vocabulario
+        viene del programa Snaptics):
+            =========================================================
+              EXPLAIN: <target> = <val>%
+            =========================================================
+              HECHOS:
+                <fact> = <val>%
+                  <cnt> de <tot> <entidad> de <dataset>
+                  cumplen <col> <op> <val>.
+                ...
+              REGLA:
+                <target> := <expr>
+              EVALUACION:
+                <fact> = <val>% (umbral <op> <th>%) -> SE CUMPLE / NO SE CUMPLE
+                ...
+              CONCLUSION: <target> = <val>%
+            =========================================================
+        """
+        cat = self._category(target)
+        slot = self._slot_of(target)
+        lines: list[str] = []
+
+        sep_label = self._emit_msg(
+            '=========================================================',
+            newline=True,
+        )
+        head_pre = self._emit_msg(f'  EXPLAIN: {target} = ', newline=False)
+        head_pct = self._emit_msg('%', newline=True)
+
+        lines.append("; explain: encabezado")
+        lines.extend(self._emit_print_str(sep_label))
+        lines.extend(self._emit_print_str(head_pre))
+        lines.extend(self._emit_print_int(slot))
+        lines.extend(self._emit_print_str(head_pct))
+        lines.extend(self._emit_print_str(sep_label))
+
+        if cat == 'rule' and target in self.rule_structures:
+            tree = self.rule_structures[target]
+
+            facts_label = self._emit_msg(' HECHOS:', newline=True)
+            lines.extend(self._emit_print_str(facts_label))
+
+            fact_refs: list[str] = []
+            self._collect_fact_refs(tree, fact_refs)
+            for fname in fact_refs:
+                meta = self.facts_derived.get(fname)
+                if meta:
+                    lines.extend(self._emit_fact_lectura(fname, meta))
+                else:
+                    # fact con valor constante: solo mostrar valor
+                    head = self._emit_msg(f'   {fname} = ', newline=False)
+                    tail = self._emit_msg('%', newline=True)
+                    lines.extend(self._emit_print_str(head))
+                    lines.extend(self._emit_print_int(f'fact_{fname}'))
+                    lines.extend(self._emit_print_str(tail))
+
+            # Regla evaluada
+            expr_txt = self._serialize_rule_expr(tree)
+            rule_block = self._emit_msg(
+                f' REGLA:\n   {target} := {expr_txt}', newline=True
+            )
+            lines.extend(self._emit_print_str(rule_block))
+
+            # Evaluacion: una linea por comparacion crisp en la regla
+            cmps: list[dict] = []
+            self._collect_cmps(tree, cmps)
+            if cmps:
+                eval_lbl = self._emit_msg(' EVALUACION:', newline=True)
+                lines.extend(self._emit_print_str(eval_lbl))
+                for cmp_node in cmps:
+                    left = cmp_node.get('left', {})
+                    right = cmp_node.get('right', {})
+                    sym = cmp_node.get('sym', '?')
+                    ir_op = cmp_node.get('op', '')
+                    fact_name = left.get('name') if isinstance(left, dict) else None
+                    threshold = self._fmt_threshold(right)
+                    if fact_name:
+                        lines.extend(self._emit_cmp_eval(
+                            fact_name, sym, threshold, ir_op
+                        ))
+
+                # Linea explicativa del operador raiz (si es AND/OR)
+                root_op = tree.get('op') if tree.get('kind') == 'logic' else None
+                if root_op == 'OR':
+                    op_lbl = self._emit_msg(
+                        '\n   OR: basta que una condicion se cumpla\n'
+                        '   para que la regla se active.',
+                        newline=True,
+                    )
+                    lines.extend(self._emit_print_str(op_lbl))
+                elif root_op == 'AND':
+                    op_lbl = self._emit_msg(
+                        '\n   AND: todas las condiciones deben\n'
+                        '   cumplirse para que la regla se active.',
+                        newline=True,
+                    )
+                    lines.extend(self._emit_print_str(op_lbl))
+        else:
+            # query directo a un fact: mostrar su lectura
+            meta = self.facts_derived.get(target)
+            if meta:
+                fact_hdr = self._emit_msg(' HECHO:', newline=True)
+                lines.extend(self._emit_print_str(fact_hdr))
+                lines.extend(self._emit_fact_lectura(target, meta))
+                desc_lbl = self._emit_msg(
+                    f'\n DEFINICION: {self._describe_fact(meta)}',
+                    newline=True,
+                )
+                lines.extend(self._emit_print_str(desc_lbl))
+
+        # Conclusion
+        concl_pre = self._emit_msg(
+            '\n CONCLUSION: ' + target + ' = ', newline=False
+        )
+        concl_pct = self._emit_msg('%', newline=True)
+        lines.extend(self._emit_print_str(concl_pre))
+        lines.extend(self._emit_print_int(slot))
+        lines.extend(self._emit_print_str(concl_pct))
+        lines.extend(self._emit_print_str(sep_label))
+
+        lines.append("CALL nav_pause")
+        lines.append("")
+        return lines
+
+    def _emit_why_body(self, target: str) -> list[str]:
+        """Pantalla 'why': razonamiento causal con conteos reales.
+
+        =========================================================
+          WHY: <target> = <val>%
+        =========================================================
+          Origen: <dataset> (<where_cond>)
+          HECHO 1: <fact> = <val>%
+            <cnt> de <tot> <entidad> de <dataset>
+            cumplen <cond>.
+            Umbral: <op> <th>%. SE CUMPLE / NO SE CUMPLE.
+          ...
+          --------------------------------------------------------
+          RAZONAMIENTO:
+            La regla combina los hechos con <OR/AND>.
+          FACTOR DECISIVO (cuando hay 2 hechos):
+            <fact_dominante> — <cnt> de <tot> <entidad> cumplen.
+          --------------------------------------------------------
+          CONCLUSION: <target> = <val>%
+        =========================================================
+        """
+        cat = self._category(target)
+        slot = self._slot_of(target)
+        lines: list[str] = []
+
+        sep_label = self._emit_msg(
+            '=========================================================',
+            newline=True,
+        )
+        head_pre = self._emit_msg(f'  WHY: {target} = ', newline=False)
+        head_pct = self._emit_msg('%', newline=True)
+
+        lines.append("; why: encabezado")
+        lines.extend(self._emit_print_str(sep_label))
+        lines.extend(self._emit_print_str(head_pre))
+        lines.extend(self._emit_print_int(slot))
+        lines.extend(self._emit_print_str(head_pct))
+        lines.extend(self._emit_print_str(sep_label))
+
+        if cat == 'rule' and target in self.rule_structures:
+            tree = self.rule_structures[target]
+
+            # 1) Origen: dataset del primer fact con metadata
+            fact_refs: list[str] = []
+            self._collect_fact_refs(tree, fact_refs)
+
+            origen_text = self._build_origen_text(fact_refs)
+            if origen_text:
+                origen_lbl = self._emit_msg(' ' + origen_text, newline=True)
+                lines.extend(self._emit_print_str(origen_lbl))
+                lines.append("")
+
+            # 2) Cada hecho: lectura + evaluacion vs umbral
+            cmps: list[dict] = []
+            self._collect_cmps(tree, cmps)
+            cmps_by_fact = {}
+            for c in cmps:
+                left = c.get('left', {})
+                fn = left.get('name') if isinstance(left, dict) else None
+                if fn:
+                    cmps_by_fact[fn] = c
+
+            for idx, fname in enumerate(fact_refs, start=1):
+                meta = self.facts_derived.get(fname)
+                hdr = self._emit_msg(f' HECHO {idx}: {fname}', newline=True)
+                lines.extend(self._emit_print_str(hdr))
+                if meta:
+                    lines.extend(self._emit_fact_lectura(fname, meta, indent='   '))
+                cmp_node = cmps_by_fact.get(fname)
+                if cmp_node:
+                    sym = cmp_node.get('sym', '?')
+                    ir_op = cmp_node.get('op', '')
+                    threshold = self._fmt_threshold(cmp_node.get('right', {}))
+                    umbral_lbl = self._emit_msg(
+                        f'   Umbral exigido: {sym} {threshold}%. ',
+                        newline=False,
+                    )
+                    lines.extend(self._emit_print_str(umbral_lbl))
+                    lines.extend(self._emit_cmp_decision(
+                        fname, threshold, ir_op
+                    ))
+                lines.append("")
+
+            # 3) Razonamiento + factor decisivo
+            root_op = tree.get('op') if tree.get('kind') == 'logic' else None
+            sep2 = self._emit_msg(
+                ' ---------------------------------------------------------',
+                newline=True,
+            )
+            lines.extend(self._emit_print_str(sep2))
+
+            if root_op == 'OR':
+                razon_lbl = self._emit_msg(
+                    ' RAZONAMIENTO:\n'
+                    '   La regla combina los hechos con OR.\n'
+                    '   Basta una condicion verdadera para\n'
+                    '   activar la regla.',
+                    newline=True,
+                )
+                lines.extend(self._emit_print_str(razon_lbl))
+            elif root_op == 'AND':
+                razon_lbl = self._emit_msg(
+                    ' RAZONAMIENTO:\n'
+                    '   La regla combina los hechos con AND.\n'
+                    '   Todas las condiciones deben cumplirse\n'
+                    '   para activar la regla.',
+                    newline=True,
+                )
+                lines.extend(self._emit_print_str(razon_lbl))
+            else:
+                razon_lbl = self._emit_msg(
+                    f' RAZONAMIENTO:\n'
+                    f'   La regla evalua la expresion:\n'
+                    f'   {self._serialize_rule_expr(tree)}',
+                    newline=True,
+                )
+                lines.extend(self._emit_print_str(razon_lbl))
+
+            # Factor decisivo: solo si hay exactamente 2 facts referenciados
+            if len(fact_refs) == 2 and root_op in ('OR', 'AND'):
+                lines.extend(self._emit_factor_decisivo(
+                    fact_refs[0], fact_refs[1], root_op
+                ))
+
+            lines.extend(self._emit_print_str(sep2))
+        else:
+            meta = self.facts_derived.get(target)
+            if meta:
+                hdr = self._emit_msg(' HECHO:', newline=True)
+                lines.extend(self._emit_print_str(hdr))
+                lines.extend(self._emit_fact_lectura(target, meta))
+                desc_lbl = self._emit_msg(
+                    f'\n Este hecho mide: {self._describe_fact(meta)}',
+                    newline=True,
+                )
+                lines.extend(self._emit_print_str(desc_lbl))
+
+        # Conclusion final
+        concl_pre = self._emit_msg(
+            '\n CONCLUSION: ' + target + ' = ', newline=False
+        )
+        concl_pct = self._emit_msg('%', newline=True)
+        lines.extend(self._emit_print_str(concl_pre))
+        lines.extend(self._emit_print_int(slot))
+        lines.extend(self._emit_print_str(concl_pct))
+        lines.extend(self._emit_print_str(sep_label))
+
+        lines.append("CALL nav_pause")
+        lines.append("")
+        return lines
+
+    def _build_origen_text(self, fact_refs: list[str]) -> str:
+        """Construye el texto 'Origen: <dataset> (con <where>)'.
+        Toma el dataset del primer fact con metadata.
+        """
+        for fname in fact_refs:
+            meta = self.facts_derived.get(fname)
+            if meta:
+                dataset = meta.get('dataset')
+                if dataset:
+                    entidad = self._entity_noun(dataset)
+                    filt = self.datasets_with_filter.get(dataset)
+                    if filt:
+                        return (
+                            f"Origen: {dataset} ({entidad} con "
+                            f"{filt['col']} {filt['op']} {filt['value']})"
+                        )
+                    return f"Origen: {dataset} ({entidad})"
+        return ''
+
+    def _emit_cmp_decision(self, fact_name: str, threshold: str,
+                           ir_op: str) -> list[str]:
+        """Solo imprime 'SE CUMPLE' / 'NO SE CUMPLE' decidiendo en runtime."""
+        true_jmp = _CMP_OP_INFO.get(ir_op, ('JE', 'JNE', '?'))[0]
+        label_id = self._cmp_label_counter
+        self._cmp_label_counter += 1
+        label_true = f"xc_{label_id}"
+        label_done = f"xe_{label_id}"
+        return [
+            f"MOV AX, fact_{fact_name}",
+            f"CMP AX, {threshold}",
+            f"{true_jmp} {label_true}",
+            "LEA SI, msg_false",
+            "CALL print_log_str",
+            f"JMP {label_done}",
+            f"{label_true}:",
+            "LEA SI, msg_true",
+            "CALL print_log_str",
+            f"{label_done}:",
+        ]
+
+    def _emit_factor_decisivo(self, fact_a: str, fact_b: str,
+                              op: str) -> list[str]:
+        """Determina en runtime cual de dos facts es el factor decisivo.
+        Para OR: el de mayor cobertura. Para AND: el de menor (mas justo).
+        Imprime una descripcion concreta con sus conteos.
+        """
+        meta_a = self.facts_derived.get(fact_a) or {}
+        meta_b = self.facts_derived.get(fact_b) or {}
+        entidad_a = self._entity_noun(meta_a.get('dataset'))
+        entidad_b = self._entity_noun(meta_b.get('dataset'))
+
+        if op == 'OR':
+            header_text = (
+                ' FACTOR DECISIVO:\n'
+                '   La condicion con mayor cobertura\n'
+                '   es la que mas peso aporta:'
+            )
+            jump_if_a_wins = 'JG'   # fact_a > fact_b
+        else:  # AND
+            header_text = (
+                ' CONDICION MAS AJUSTADA:\n'
+                '   La condicion con menor cobertura\n'
+                '   es la que limita la regla:'
+            )
+            jump_if_a_wins = 'JL'   # fact_a < fact_b
+
+        # Mensajes describiendo cada caso (estaticos, generados en compile).
+        msg_a = self._emit_msg(
+            f'   -> {fact_a}: ', newline=False
+        )
+        msg_a_mid = self._emit_msg(
+            f' de ', newline=False
+        )
+        msg_a_tail = self._emit_msg(
+            f' {entidad_a} cumplen.', newline=True
+        )
+        msg_b = self._emit_msg(
+            f'   -> {fact_b}: ', newline=False
+        )
+        msg_b_mid = self._emit_msg(
+            f' de ', newline=False
+        )
+        msg_b_tail = self._emit_msg(
+            f' {entidad_b} cumplen.', newline=True
+        )
+        header_lbl = self._emit_msg(header_text, newline=True)
+
+        label_id = self._cmp_label_counter
+        self._cmp_label_counter += 1
+        lbl_a = f"fd_a_{label_id}"
+        lbl_done = f"fd_d_{label_id}"
+
+        lines: list[str] = []
+        lines.extend(self._emit_print_str(header_lbl))
+        lines.append(f"MOV AX, fact_{fact_a}")
+        lines.append(f"CMP AX, fact_{fact_b}")
+        lines.append(f"{jump_if_a_wins} {lbl_a}")
+        # B gana: imprimir descripcion de B
+        lines.extend(self._emit_print_str(msg_b))
+        lines.extend(self._emit_print_int(f'fact_{fact_b}_cnt'))
+        lines.extend(self._emit_print_str(msg_b_mid))
+        lines.extend(self._emit_print_int(f'fact_{fact_b}_tot'))
+        lines.extend(self._emit_print_str(msg_b_tail))
+        lines.append(f"JMP {lbl_done}")
+        lines.append(f"{lbl_a}:")
+        # A gana
+        lines.extend(self._emit_print_str(msg_a))
+        lines.extend(self._emit_print_int(f'fact_{fact_a}_cnt'))
+        lines.extend(self._emit_print_str(msg_a_mid))
+        lines.extend(self._emit_print_int(f'fact_{fact_a}_tot'))
+        lines.extend(self._emit_print_str(msg_a_tail))
+        lines.append(f"{lbl_done}:")
+        return lines
 
     def _emit_compare(self, q: Quadruple) -> list[str]:
         """Comparación dentro de una regla: emite booleano crisp 0/100.
@@ -801,7 +1621,8 @@ class CodeGenerator:
 
 def generate_code(opt_result: dict,
                   parse_result: dict | None = None,
-                  dataset_path: str | None = None) -> dict:
+                  dataset_path: str | None = None,
+                  output_log_path: str | None = None) -> dict:
     """
     Punto de entrada del codegen. Sigue el mismo patrón que las fases anteriores.
 
@@ -828,7 +1649,9 @@ def generate_code(opt_result: dict,
     symbol_table = (parse_result or {}).get('symbol_table')
     quads = opt_result.get('quadruples', [])
 
-    gen = CodeGenerator(symbol_table=symbol_table, dataset_path=dataset_path)
+    gen = CodeGenerator(symbol_table=symbol_table,
+                        dataset_path=dataset_path,
+                        output_log_path=output_log_path)
     asm = gen.generate(quads)
 
     return {
