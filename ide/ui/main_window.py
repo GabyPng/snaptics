@@ -528,14 +528,11 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
             if not result.get('ok'):
                 stage = result.get('stage', '?')
                 errs = result.get('errors', [])
-                msg = f"Codegen ({stage}) reporto {len(errs)} error(es). " \
-                      f"Revisa la terminal."
-                # Loguear errores legibles
-                self._print_to_terminal_append(
-                    f"\n[Codegen] etapa '{stage}':\n" +
-                    "\n".join(f"  {e}" for e in errs)
+                detail = "\n".join(f"  {e}" for e in errs)
+                return (
+                    f"Codegen ({stage}) reporto {len(errs)} error(es):\n"
+                    f"{detail}"
                 )
-                return msg
 
             build_dir = os.path.join(_CODEGEN_HERE, 'build')
             os.makedirs(build_dir, exist_ok=True)
@@ -545,10 +542,7 @@ class SnapticsMainWindow(QtWidgets.QMainWindow):
 
             return f"ASM generado: {out_path}"
         except Exception as e:
-            self._print_to_terminal_append(
-                f"\n[Codegen] error inesperado: {e}\n{traceback.format_exc()}"
-            )
-            return f"Codegen fallo: {e}"
+            return f"Codegen fallo: {e}\n{traceback.format_exc()}"
 
     def _display_ast(self, ast):
         """Mostrar el AST formateado en un árbol jerárquico."""

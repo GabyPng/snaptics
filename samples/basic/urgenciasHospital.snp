@@ -1,0 +1,69 @@
+# =============================================================
+# urgenciasHospital.snp
+# -------------------------------------------------------------
+# Programa de demostración sobre monitoreo de pacientes en urgencias:
+#   - probabilidad simple    P(col > N)
+#   - probabilidad condicional P(A given B)
+#   - filtro WHERE en el dataset
+#   - reglas que comparan facts contra umbrales literales (> 0.35, etc.)
+#   - múltiples queries con explain y why
+#
+# El CSV asociado es samples/basic/urgencias.csv (3 columnas, sin header):
+#   col 0 = frecuencia_cardiaca  (lpm)
+#   col 1 = presion_sistolica    (mmHg)
+#   col 2 = temperatura_corporal (°C, entero representativo)
+# El SELECT más abajo lista esas tres columnas EN ORDEN, ese es el contrato.
+# Antes de ejecutar, copia el CSV a la ruta del `import from`.
+# =============================================================
+
+dataset urgencias_raw  = import from "C:\emu8086\vdrive\C\urgencias.csv"
+
+dataset urgencias_foco = select frecuencia_cardiaca: int, presion_sistolica: int, temperatura_corporal: int
+                         from urgencias_raw
+                         where presion_sistolica > 120
+
+
+# ---- Hechos: proporciones sobre pacientes en seguimiento ----
+
+fact taquicardia              = P(urgencias_foco.frecuencia_cardiaca > 100)
+fact hipertension             = P(urgencias_foco.presion_sistolica > 140)
+fact fiebre                   = P(urgencias_foco.temperatura_corporal > 37)
+
+fact p_hipert_dada_taquicardia =
+    P(urgencias_foco.presion_sistolica > 140 given urgencias_foco.frecuencia_cardiaca > 100)
+
+fact p_fiebre_dada_taquicardia =
+    P(urgencias_foco.temperatura_corporal > 37 given urgencias_foco.frecuencia_cardiaca > 100)
+
+
+# ---- Reglas: razonamiento sobre los hechos ----
+
+rule alerta_cardiovascular :-
+    taquicardia > 0.35
+    or hipertension > 0.40
+
+rule riesgo_critico :-
+    p_hipert_dada_taquicardia > 0.60
+    and p_fiebre_dada_taquicardia > 0.50
+
+rule riesgo_moderado :-
+    p_hipert_dada_taquicardia > 0.40
+    and p_hipert_dada_taquicardia <= 0.60
+
+rule paciente_estable :-
+    taquicardia < 0.20
+    and hipertension < 0.20
+
+
+# ---- Consultas ----
+# alerta_cardiovascular se consulta en los 3 niveles para demostrar explain/why.
+# Las demás reglas usan solo basic.
+# La salida completa se escribe en C:\emu8086\vdrive\C\output\urgenciasHospital.txt
+
+query alerta_cardiovascular
+query alerta_cardiovascular explain
+query alerta_cardiovascular why
+
+query riesgo_critico
+query riesgo_moderado
+query paciente_estable
